@@ -1,0 +1,270 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/ui/form';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Product, ProductFormData } from '@/lib/types/product';
+import { Loader2, Image as ImageIcon } from 'lucide-react';
+import { toast } from 'react-toastify';
+import Image from "next/image";
+
+const productFormSchema = z.object({
+    productName: z.string().min(2, { message: 'Product name must be at least 2 characters' }),
+    // Update description to be optional to align with ProductFormData
+    description: z.string().optional(),
+    categoryName: z.string().min(1, { message: 'Please select a category' }),
+    price: z.coerce.number().min(0.01, { message: 'Price must be greater than 0' }),
+    stock: z.coerce.number().int().min(0, { message: 'Stock cannot be negative' }),
+});
+
+
+type ProductFormProps = {
+    onSubmitAction: (data: ProductFormData) => Promise<void>;
+    initialData?: Product;
+    isLoading?: boolean;
+    categories: string[];
+};
+
+export default function ProductForm({
+                                        onSubmitAction,
+                                        initialData,
+                                        isLoading = false,
+                                        categories,
+                                    }: ProductFormProps) {
+    const [imagePreview, setImagePreview] = useState<string | null>(
+        initialData?.productImgUrl || null
+    );
+    const [imageFile, setImageFile] = useState<File | undefined>(undefined);
+    const [imageUploading, setImageUploading] = useState(false);
+
+    const form = useForm<z.infer<typeof productFormSchema>>({
+        resolver: zodResolver(productFormSchema),
+        defaultValues: {
+            productName: initialData?.productName || '',
+            categoryName: initialData?.categoryName || '',
+            price: initialData?.price || 0,
+            stock: initialData?.stock || 0,
+            description: initialData?.description || '',
+        },
+    });
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        const maxSize = 3 * 1024 * 1024; // 3MB
+        if (!validTypes.includes(file.type)) {
+            toast.error('Please upload a valid image (JPEG, PNG, or GIF).');
+            return;
+        }
+        if (file.size > maxSize) {
+            toast.error('Image size must be less than 5MB.');
+            return;
+        }
+
+        setImageFile(file);
+
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadstart = () => setImageUploading(true);
+        reader.onload = (event) => {
+            setImagePreview(event.target?.result as string);
+            setImageUploading(false);
+        };
+        reader.onerror = () => {
+            toast.error('Failed to load image preview.');
+            setImageUploading(false);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleSubmit = async (values: z.infer<typeof productFormSchema>) => {
+        try {
+            const formData: ProductFormData = {
+                ...values,
+                productImage: imageFile,
+            };
+            await onSubmitAction(formData);
+            form.reset();
+            setImagePreview(null);
+            setImageFile(undefined);
+            toast.success(
+                initialData ? 'Product updated successfully!' : 'Product added successfully!'
+            );
+        } catch (e) {
+            toast.error('Failed to submit products. Please try again.');
+            console.log(e);
+        }
+    };
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                        <FormField
+                            control={form.control}
+                            name="productName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Product Name</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter product name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="categoryName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Category</FormLabel>
+                                    <Select
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a category" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {categories.map((category) => (
+                                                <SelectItem key={category} value={category}>
+                                                    {category}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="price"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Price</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.01" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="stock"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Stock</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Description</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="Enter product description"
+                                            className="h-24"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <div>
+                            <FormLabel>Product Image</FormLabel>
+                            <div
+                                className="mt-2 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer"
+                                style={{ borderColor: imagePreview ? 'transparent' : '#FF8FAB' }}
+                                onClick={() => document.getElementById('products-image')?.click()}
+                            >
+                                {imageUploading ? (
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                                        <p className="text-sm text-gray-500">Uploading...</p>
+                                    </div>
+                                ) : imagePreview ? (
+                                    <div className="relative w-full h-32 overflow-hidden rounded-md">
+                                        <Image
+                                            src={imagePreview}
+                                            alt="Product preview"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                                        <p className="text-sm text-gray-500">
+                                            Click to upload product image
+                                        </p>
+                                    </div>
+                                )}
+                                <input
+                                    id="product-image"
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleImageChange}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        style={{ backgroundColor: '#FF4B6A', color: 'white' }}
+                    >
+                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {initialData ? 'Update Product' : 'Add Product'}
+                    </Button>
+                </div>
+            </form>
+        </Form>
+    );
+}
