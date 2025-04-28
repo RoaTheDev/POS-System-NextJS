@@ -29,6 +29,7 @@ import {toast, Toaster} from 'sonner';
 import ProductForm from '@/components/products/ProductForm';
 import {Edit, Package, Plus, Search, Trash2, User} from 'lucide-react';
 import Image from 'next/image';
+import Pagination from '@/components/common/Pagination';
 
 const categories = ['All', 'Beverages', 'Food', 'Pastries', 'Dessert', 'Merchandise'];
 
@@ -42,6 +43,8 @@ export default function ProductsPage() {
         updateProduct,
         deleteProduct,
         searchProducts,
+        totalProducts,
+        totalPages,
     } = useProductStore();
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -51,18 +54,21 @@ export default function ProductsPage() {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
-        fetchProducts();
-    }, [fetchProducts]);
+        fetchProducts(currentPage, itemsPerPage);
+    }, [fetchProducts, currentPage, itemsPerPage]);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
-            await searchProducts(searchTerm, selectedCategory === 'All' ? undefined : selectedCategory);
+            setCurrentPage(1);
+            await searchProducts(searchTerm, selectedCategory === 'All' ? undefined : selectedCategory, 1, itemsPerPage);
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [searchTerm, selectedCategory, searchProducts]);
+    }, [searchTerm, selectedCategory, searchProducts, itemsPerPage]);
 
     const handleAddProduct = async (data: ProductFormData) => {
         try {
@@ -95,6 +101,13 @@ export default function ProductsPage() {
             setIsDeleteDialogOpen(false);
             setDeleteProductId(null);
             toast.success('Product deleted successfully');
+
+            // Refresh current page or go to previous page if this was the last item
+            if (products.length === 1 && currentPage > 1) {
+                setCurrentPage(currentPage - 1);
+            } else {
+                await fetchProducts(currentPage, itemsPerPage);
+            }
         } catch (error) {
             toast.error(`Failed to delete product: ${(error as Error).message}`);
         }
@@ -108,6 +121,21 @@ export default function ProductsPage() {
     const openDeleteDialog = (productId: string) => {
         setDeleteProductId(productId);
         setIsDeleteDialogOpen(true);
+    };
+
+    const handlePageChange = async (page: number) => {
+        setCurrentPage(page);
+        if (searchTerm || selectedCategory !== 'All') {
+            await searchProducts(searchTerm, selectedCategory === 'All' ? undefined : selectedCategory, page, itemsPerPage);
+        } else {
+            await fetchProducts(page, itemsPerPage);
+        }
+    };
+
+    const handleItemsPerPageChange = (value: string) => {
+        const newItemsPerPage = parseInt(value, 10);
+        setItemsPerPage(newItemsPerPage);
+        setCurrentPage(1); // Reset to first page when changing items per page
     };
 
     return (
@@ -276,25 +304,25 @@ export default function ProductsPage() {
                                                     </td>
                                                     <td className='py-3 px-4'>{product.productName}</td>
                                                     <td className='py-3 px-4 hidden sm:table-cell'>
-                              <span
-                                  className='px-2 py-1 rounded-full text-xs'
-                                  style={{
-                                      backgroundColor: theme.secondary,
-                                      color: theme.text,
-                                  }}
-                              >
-                                {product.categoryName}
-                              </span>
+                                                        <span
+                                                            className='px-2 py-1 rounded-full text-xs'
+                                                            style={{
+                                                                backgroundColor: theme.secondary,
+                                                                color: theme.text,
+                                                            }}
+                                                        >
+                                                            {product.categoryName}
+                                                        </span>
                                                     </td>
                                                     <td className='py-3 px-4'>${product.price.toFixed(2)}</td>
                                                     <td className='py-3 px-4'>
-                              <span
-                                  className={`px-2 py-1 rounded-full text-xs ${
-                                      product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                  }`}
-                              >
-                                {product.stock}
-                              </span>
+                                                        <span
+                                                            className={`px-2 py-1 rounded-full text-xs ${
+                                                                product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                            }`}
+                                                        >
+                                                            {product.stock}
+                                                        </span>
                                                     </td>
                                                     <td className='py-3 px-4'>
                                                         <div className='flex space-x-2'>
@@ -328,6 +356,17 @@ export default function ProductsPage() {
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {/* Use the Pagination component */}
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    totalItems={totalProducts}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChangeAction={handlePageChange}
+                                    onItemsPerPageChangeAction={handleItemsPerPageChange}
+                                    itemName="products"
+                                />
                             </CardContent>
                         </Card>
 

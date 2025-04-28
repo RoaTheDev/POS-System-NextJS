@@ -19,11 +19,12 @@ export default function AuthenticatedLayout({children}: {
         <div className="flex h-screen">
             <Navigation/>
             <main
-                className="flex-1 overflow-auto p-4 lg:p-8 pb-20 lg:pb-8"
-                style={{backgroundColor: theme.background}}
+                className="flex-1 overflow-auto p-2 lg:p-8 pb-52 lg:pb-8 mb-10 sm:mb-1"
+                style={{ backgroundColor: theme.background }}
             >
                 {children}
             </main>
+
         </div>
     )
 }

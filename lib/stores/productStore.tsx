@@ -9,7 +9,12 @@ import {
     query,
     orderBy,
     where,
-    Timestamp
+    Timestamp,
+    limit,
+    startAfter,
+    getCountFromServer,
+    QueryDocumentSnapshot,
+    DocumentData,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ProductType, ProductFormData } from '@/lib/types/productType';
@@ -45,11 +50,13 @@ interface ProductState {
     products: ProductType[];
     isLoading: boolean;
     error: AppError | null;
-    fetchProducts: () => Promise<void>;
+    totalProducts: number;
+    totalPages: number;
+    fetchProducts: (page?: number, pageSize?: number) => Promise<void>;
     addProduct: (productData: ProductFormData) => Promise<void>;
     updateProduct: (id: string, productData: ProductFormData) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
-    searchProducts: (searchTerm: string, category?: string) => Promise<void>;
+    searchProducts: (searchTerm: string, category?: string, page?: number, pageSize?: number) => Promise<void>;
     clearError: () => void;
 }
 
@@ -106,26 +113,102 @@ const deleteFromCloudinary = async (publicId: string): Promise<void> => {
     }
 };
 
+// Cache for pagination data
+interface PaginationCache {
+    [key: string]: {
+        pageDocuments: Map<number, QueryDocumentSnapshot<DocumentData>>;
+        totalCount: number;
+    };
+}
+
+// Initialize the cache
+const paginationCache: PaginationCache = {};
+
 export const useProductStore = create<ProductState>((set, get) => ({
     products: [],
     isLoading: false,
     error: null,
+    totalProducts: 0,
+    totalPages: 0,
 
     clearError: () => set({ error: null }),
 
-    fetchProducts: async () => {
+    fetchProducts: async (page = 1, pageSize = 10) => {
         set({ isLoading: true, error: null });
         try {
             const productsRef = collection(db, 'products');
-            const q = query(productsRef, orderBy('createdAt', 'desc'));
+            const cacheKey = 'all';
+
+            // Initialize cache entry if not exists
+            if (!paginationCache[cacheKey]) {
+                paginationCache[cacheKey] = {
+                    pageDocuments: new Map(),
+                    totalCount: 0
+                };
+            }
+
+            // Get total count for pagination
+            if (paginationCache[cacheKey].totalCount === 0) {
+                const snapshot = await getCountFromServer(productsRef);
+                paginationCache[cacheKey].totalCount = snapshot.data().count;
+            }
+
+            const totalCount = paginationCache[cacheKey].totalCount;
+            const totalPages = Math.ceil(totalCount / pageSize);
+
+            // Create the base query with ordering
+            let q = query(productsRef, orderBy('createdAt', 'desc'));
+
+            // Apply pagination
+            if (page > 1) {
+                // Get the start document for pagination
+                const startDoc = paginationCache[cacheKey].pageDocuments.get(page - 1);
+
+                if (startDoc) {
+                    // We have the previous page's last document, use it to paginate
+                    q = query(q, startAfter(startDoc), limit(pageSize));
+                } else {
+                    // We don't have the previous page cached, use limit and offset approach
+                    // This is less efficient but works as a fallback
+                    const prevPageDocs = await getDocs(query(
+                        productsRef,
+                        orderBy('createdAt', 'desc'),
+                        limit((page - 1) * pageSize)
+                    ));
+
+                    if (!prevPageDocs.empty) {
+                        const lastVisible = prevPageDocs.docs[prevPageDocs.docs.length - 1];
+                        q = query(q, startAfter(lastVisible), limit(pageSize));
+                    } else {
+                        q = query(q, limit(pageSize));
+                    }
+                }
+            } else {
+                // First page, just apply the limit
+                q = query(q, limit(pageSize));
+            }
+
+            // Execute the query
             const querySnapshot = await getDocs(q);
+
+            // Store last document for next page
+            if (!querySnapshot.empty) {
+                paginationCache[cacheKey].pageDocuments.set(
+                    page,
+                    querySnapshot.docs[querySnapshot.docs.length - 1]
+                );
+            }
 
             const productsData: ProductType[] = querySnapshot.docs.map((doc) => ({
                 ...(doc.data() as Omit<ProductType,'productId'>),
                 productId: doc.id,
             }));
 
-            set({ products: productsData });
+            set({
+                products: productsData,
+                totalProducts: totalCount,
+                totalPages: totalPages
+            });
         } catch (error) {
             const appError = handleError(error);
             set({ error: appError });
@@ -153,11 +236,17 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 stock: Number(productData.stock),
                 description: productData.description,
                 productImgUrl,
-                cloudinaryPublicId, // Store the Cloudinary public ID for later deletion if needed
+                cloudinaryPublicId,
                 createdAt: Timestamp.now(),
             });
 
-            await get().fetchProducts();
+            // Clear cache on modifications
+            Object.keys(paginationCache).forEach(key => {
+                paginationCache[key].pageDocuments.clear();
+                paginationCache[key].totalCount = 0;
+            });
+
+            await get().fetchProducts(1); // Go back to first page after adding
         } catch (error) {
             const appError = handleError(error);
             set({ error: appError });
@@ -206,7 +295,14 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 cloudinaryPublicId,
             });
 
-            await get().fetchProducts();
+            // Clear cache on modifications to ensure fresh data
+            Object.keys(paginationCache).forEach(key => {
+                paginationCache[key].pageDocuments.clear();
+            });
+
+            // Refresh current page
+            const currentPage = Math.ceil(get().products.findIndex(p => p.productId === productId) / 10) + 1;
+            await get().fetchProducts(currentPage);
         } catch (error) {
             const appError = handleError(error);
             set({ error: appError });
@@ -237,8 +333,16 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
             await deleteDoc(productRef);
 
+            // Clear cache on modifications
+            Object.keys(paginationCache).forEach(key => {
+                paginationCache[key].pageDocuments.clear();
+                paginationCache[key].totalCount -= 1; // Decrement count but refresh on next fetch
+            });
+
             set({
                 products: get().products.filter((p) => p.productId !== productId),
+                totalProducts: Math.max(0, get().totalProducts - 1),
+                totalPages: Math.ceil((get().totalProducts - 1) / 10) // Assuming default page size
             });
         } catch (error) {
             const appError = handleError(error);
@@ -248,30 +352,76 @@ export const useProductStore = create<ProductState>((set, get) => ({
         }
     },
 
-    searchProducts: async (searchTerm: string, category?: string) => {
+    searchProducts: async (searchTerm: string, category?: string, page = 1, pageSize = 10) => {
         set({ isLoading: true, error: null });
         try {
+            // Create a cache key based on search parameters
+            const cacheKey = `search:${searchTerm}:${category || 'all'}`;
+
+            // Initialize cache entry if not exists
+            if (!paginationCache[cacheKey]) {
+                paginationCache[cacheKey] = {
+                    pageDocuments: new Map(),
+                    totalCount: 0
+                };
+            }
+
             const productsRef = collection(db, 'products');
-            const q = category && category !== 'All'
+
+            // Create base query depending on category
+            const baseQuery = category && category !== 'All'
                 ? query(productsRef, where('categoryName', '==', category), orderBy('createdAt', 'desc'))
                 : query(productsRef, orderBy('createdAt', 'desc'));
 
-            const querySnapshot = await getDocs(q);
+            // Get total count for this search if not already cached
+            if (paginationCache[cacheKey].totalCount === 0) {
+                const countSnapshot = await getDocs(baseQuery);
 
-            const productsData: ProductType[] = querySnapshot.docs.map((doc) => ({
+                // For search terms, we need to filter in memory since Firestore doesn't support text search
+                let filteredDocs = countSnapshot.docs;
+                if (searchTerm) {
+                    filteredDocs = countSnapshot.docs.filter(doc => {
+                        const data = doc.data();
+                        return (
+                            data.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (data.description && data.description.toLowerCase().includes(searchTerm.toLowerCase()))
+                        );
+                    });
+                }
+
+                paginationCache[cacheKey].totalCount = filteredDocs.length;
+            }
+
+            const totalCount = paginationCache[cacheKey].totalCount;
+            const totalPages = Math.ceil(totalCount / pageSize);
+
+            // Execute query with pagination
+            const querySnapshot = await getDocs(baseQuery);
+
+            // Filter products by search term (client-side filtering)
+            let filteredProducts = querySnapshot.docs.map(doc => ({
                 ...(doc.data() as Omit<ProductType, 'productId'>),
                 productId: doc.id,
             }));
 
-            const filteredProducts = searchTerm
-                ? productsData.filter(
+            if (searchTerm) {
+                filteredProducts = filteredProducts.filter(
                     (product) =>
                         product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
-                )
-                : productsData;
+                );
+            }
 
-            set({ products: filteredProducts });
+            // Apply manual pagination since we've filtered in memory
+            const startIndex = (page - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+            set({
+                products: paginatedProducts,
+                totalProducts: totalCount,
+                totalPages: totalPages
+            });
         } catch (error) {
             const appError = handleError(error);
             set({ error: appError });

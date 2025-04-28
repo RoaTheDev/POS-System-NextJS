@@ -1,8 +1,7 @@
-// components/Navigation.tsx
 'use client'
 
 import {usePathname, useRouter} from 'next/navigation'
-import {Home, LogOut, Package, ShoppingCart, User} from 'lucide-react'
+import {Home, LogOut, Package, ShoppingCart, User, User2} from 'lucide-react'
 import {theme} from '@/lib/colorPattern'
 import {useAuth} from '@/lib/stores/AuthContext'
 
@@ -11,14 +10,13 @@ export default function Navigation() {
     const router = useRouter()
     const {logout, user} = useAuth()
 
-    // Define navigation items
     const navItems = [
         {name: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard'},
         {name: 'products', label: 'Products', icon: Package, path: '/products'},
         {name: 'sales', label: 'Sales', icon: ShoppingCart, path: '/sales'},
+        {name: 'customers', label: "Customers", icon: User2, path: '/customers'}
     ]
 
-    // Determine active page based on current pathname
     const activePage = navItems.find(item => pathname === item.path)?.name || 'dashboard'
 
     const handleLogout = async () => {
@@ -32,7 +30,7 @@ export default function Navigation() {
         >
             <div className="p-4">
                 <h1 className="text-xl font-bold" style={{color: theme.primary}}>
-                    Elizabeth Rose POS
+               Mai Sophany Sound
                 </h1>
             </div>
             <nav className="p-4">

@@ -28,6 +28,9 @@ import {Separator} from '@/components/ui/separator';
 import ProductCard from "@/components/sales/ProductCard";
 import {useInView} from 'react-intersection-observer';
 import {useCustomers, useFilteredProducts, useProducts} from '@/lib/queries/saleQueries';
+import Link from "next/link";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type CurrencyCode = 'USD' | 'THB' | 'KHR';
 
@@ -39,6 +42,7 @@ const CONVERSION_RATES: Record<CurrencyCode, number> = {
 
 export default function SalesPage() {
     const [searchQuery, setSearchQuery] = useState('');
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [currency, setCurrency] = useState<CurrencyCode>('USD');
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -50,6 +54,7 @@ export default function SalesPage() {
     const [loading, setLoading] = useState(false);
     const [saleComplete, setSaleComplete] = useState(false);
     const [saleId, setSaleId] = useState('');
+    const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
 
     const {data: customersData, isLoading: isLoadingCustomers} = useCustomers();
     const {data: filteredProductsData, isLoading: isLoadingFiltered} = useFilteredProducts(searchQuery);
@@ -82,7 +87,6 @@ export default function SalesPage() {
     } = useSalesStore();
     const router = useRouter();
 
-
     useEffect(() => {
         if (customersData && selectedCustomer) {
             const customer = customersData.find(c => c.customerId === selectedCustomer.customerId);
@@ -98,12 +102,21 @@ export default function SalesPage() {
         'KHR': '៛'
     };
 
+    // Filter customers based on search query
+    const filteredCustomers = customersData?.filter(customer => {
+        if (!customerSearchQuery) return true;
+        const query = customerSearchQuery.toLowerCase();
+        return (
+            customer.name.toLowerCase().includes(query) ||
+            customer.phone.toString().includes(query)
+        );
+    }) || [];
+
     const convertCurrency = (amount: number, fromCurrency: CurrencyCode = 'USD', toCurrency: CurrencyCode = currency): number => {
         if (fromCurrency === toCurrency) return amount;
         const amountInUSD = fromCurrency === 'USD' ? amount : amount / CONVERSION_RATES[fromCurrency];
         return amountInUSD * CONVERSION_RATES[toCurrency];
     };
-
 
     const displayProducts = searchQuery ?
         (filteredProductsData || []) :
@@ -227,7 +240,6 @@ export default function SalesPage() {
         }, 0);
     };
 
-
     if (saleComplete) {
         return (
             <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
@@ -266,115 +278,69 @@ export default function SalesPage() {
     }
 
     return (
-        <div className="flex flex-col lg:flex-row h-full gap-6">
-            <div className="flex-1 flex flex-col">
-                <div className="mb-4">
-                    <h1 className="flex text-2xl font-bold mb-4" style={{color: theme.primary}}>
-                        Products
-                    </h1>
-
-                    <div className="relative">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
-                        <Input
-                            placeholder="Search products..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                </div>
-
-                <div
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4">
-                    {isLoadingProducts || isLoadingFiltered ? (
-                        <div className="col-span-full flex items-center justify-center h-40">
-                            <p style={{color: theme.text}}>Loading products...</p>
-                        </div>
-                    ) : displayProducts.length === 0 ? (
-                        <div className="col-span-full flex items-center justify-center h-40 text-center">
-                            <p style={{color: theme.text}}>
-                                No products found. Try a different search term.
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            {displayProducts.map((product) => (
-                                <ProductCard
-                                    key={product.productId}
-                                    product={{
-                                        ...product,
-                                        displayPrice: convertCurrency(product.price, 'USD', currency)
-                                    }}
-                                    addToCartAction={addToCart}
-                                    currencySymbol={getCurrencySymbol()}
-                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
-                                />
-                            ))}
-
-
-                            {!searchQuery && hasNextPage && (
-                                <div
-                                    ref={ref}
-                                    className="col-span-full flex justify-center my-4"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => fetchNextPage()}
-                                        disabled={isFetchingNextPage}
-                                    >
-                                        {isFetchingNextPage ? (
-                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>
-                                        ) : (
-                                            <ChevronDown className="mr-2 h-4 w-4"/>
-                                        )}
-                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
-                                    </Button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* Right side - Cart */}
-            <div className="w-full lg:w-96 flex flex-col">
+        <div className="flex flex-col lg:flex-row h-full gap-6 pb-20 lg:pb-0">
+            <div className="w-full lg:w-96 flex flex-col order-1 lg:order-2">
                 <Card className="flex-grow">
                     <CardHeader>
                         <CardTitle style={{color: theme.primary}}>Sale Summary</CardTitle>
                     </CardHeader>
-
                     <CardContent className="flex flex-col h-full">
-                        {/* Customer section */}
                         <div className="mb-4">
                             <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
                                 Customer
                             </label>
-
                             {!isAddingCustomer ? (
-                                <div className="flex gap-2">
-                                    <Select
-                                        value={selectedCustomer?.customerId || ''}
-                                        onValueChange={(value) => {
-                                            const customer = customersData?.find(c => c.customerId === value);
-                                            setSelectedCustomer(customer || null);
-                                        }}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a customer"/>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {isLoadingCustomers ? (
-                                                <SelectItem value="loading" disabled>Loading customers...</SelectItem>
-                                            ) : (
-                                                customersData?.map((customer) => (
-                                                    <SelectItem key={customer.customerId} value={customer.customerId}>
-                                                        {customer.name} ({customer.phone})
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-
+                                <div className="flex gap-4">
+                                    <Popover open={customerPopoverOpen} onOpenChange={setCustomerPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={customerPopoverOpen}
+                                                className="w-72 justify-between"
+                                            >
+                                                {selectedCustomer ? selectedCustomer.name : "Select customer..."}
+                                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-full p-0" align="start">
+                                            <Command>
+                                                <CommandInput
+                                                    placeholder="Search customer..."
+                                                    value={customerSearchQuery}
+                                                    onValueChange={setCustomerSearchQuery}
+                                                />
+                                                <CommandList>
+                                                    <CommandEmpty>No customer found</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {isLoadingCustomers ? (
+                                                            <CommandItem disabled>Loading customers...</CommandItem>
+                                                        ) : (
+                                                            filteredCustomers.map((customer) => (
+                                                                <CommandItem
+                                                                    key={customer.customerId}
+                                                                    value={customer.customerId}
+                                                                    onSelect={() => {
+                                                                        setSelectedCustomer(customer);
+                                                                        setCustomerPopoverOpen(false);
+                                                                        setCustomerSearchQuery('');
+                                                                    }}
+                                                                >
+                                                                    <div className="flex flex-col">
+                                                                        <span>{customer.name}</span>
+                                                                        <span className="text-xs text-gray-500">{customer.phone}</span>
+                                                                    </div>
+                                                                    {selectedCustomer?.customerId === customer.customerId && (
+                                                                        <CheckCircle className="ml-auto h-4 w-4" />
+                                                                    )}
+                                                                </CommandItem>
+                                                            ))
+                                                        )}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                     <Button
                                         variant="outline"
                                         size="icon"
@@ -398,7 +364,6 @@ export default function SalesPage() {
                                             <X size={16}/>
                                         </Button>
                                     </div>
-
                                     <Input
                                         placeholder="Name"
                                         value={newCustomer.name}
@@ -426,7 +391,6 @@ export default function SalesPage() {
                                     </Button>
                                 </div>
                             )}
-
                             {selectedCustomer && (
                                 <div className="mt-2 p-2 rounded-md" style={{backgroundColor: theme.light}}>
                                     <div className="flex items-start">
@@ -448,10 +412,7 @@ export default function SalesPage() {
                                 </div>
                             )}
                         </div>
-
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-
-                        {/* Rest of the component remains the same */}
                         {/* Payment method and Currency */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
@@ -472,7 +433,6 @@ export default function SalesPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-
                             <div>
                                 <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
                                     Currency
@@ -492,15 +452,12 @@ export default function SalesPage() {
                                 </Select>
                             </div>
                         </div>
-
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-
                         {/* Cart items */}
                         <div className="flex-grow overflow-y-auto mb-4">
                             <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
                                 Cart Items
                             </label>
-
                             {cart.length === 0 ? (
                                 <div className="text-center py-8" style={{color: theme.text}}>
                                     <Package size={32} className="mx-auto mb-2 opacity-50"/>
@@ -511,7 +468,6 @@ export default function SalesPage() {
                                     {cart.map((item) => {
                                         const priceInSelectedCurrency = convertCurrency(item.price, 'USD', currency);
                                         const itemTotalInSelectedCurrency = priceInSelectedCurrency * item.quantity;
-
                                         return (
                                             <div
                                                 key={item.productId}
@@ -555,16 +511,13 @@ export default function SalesPage() {
                                 </div>
                             )}
                         </div>
-
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-
                         {/* Exchange rate info */}
                         {currency !== 'USD' && (
                             <div className="mb-4 text-sm" style={{color: theme.text}}>
                                 <p>Exchange Rate: 1 USD = {CONVERSION_RATES[currency]} {currency}</p>
                             </div>
                         )}
-
                         {/* Total */}
                         <div className="flex justify-between items-center mb-4">
                             <p className="font-medium" style={{color: theme.text}}>Total</p>
@@ -572,7 +525,6 @@ export default function SalesPage() {
                                 {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)} {currency}
                             </p>
                         </div>
-
                         {/* Complete sale button */}
                         <Button
                             className="w-full"
@@ -593,6 +545,81 @@ export default function SalesPage() {
                         </Button>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Products - Appears second in mobile, first in desktop */}
+            <div className="flex-1 flex flex-col order-2 lg:order-1">
+                <div className="mb-4">
+                    <div className="flex justify-between mb-2.5">
+                        <h1 className="text-2xl font-bold" style={{color: theme.primary}}>
+                            <ShoppingCart className="inline mr-2 mb-1" size={24}/>
+                            Sale Management
+                        </h1>
+                        <Link href="/sales/history">
+                            <Button variant="outline" style={{borderColor: theme.primary, color: theme.primary}}>
+                                Sale History
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
+                        <Input
+                            placeholder="Search products..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4"
+                >
+                    {isLoadingProducts || isLoadingFiltered ? (
+                        <div className="col-span-full flex items-center justify-center h-40">
+                            <p style={{color: theme.text}}>Loading products...</p>
+                        </div>
+                    ) : displayProducts.length === 0 ? (
+                        <div className="col-span-full flex items-center justify-center h-40 text-center">
+                            <p style={{color: theme.text}}>
+                                No products found. Try a different search term.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            {displayProducts.map((product) => (
+                                <ProductCard
+                                    key={product.productId}
+                                    product={{
+                                        ...product,
+                                        displayPrice: convertCurrency(product.price, 'USD', currency)
+                                    }}
+                                    addToCartAction={addToCart}
+                                    currencySymbol={getCurrencySymbol()}
+                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
+                                />
+                            ))}
+                            {!searchQuery && hasNextPage && (
+                                <div
+                                    ref={ref}
+                                    className="col-span-full flex justify-center my-4"
+                                >
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => fetchNextPage()}
+                                        disabled={isFetchingNextPage}
+                                    >
+                                        {isFetchingNextPage ? (
+                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>
+                                        ) : (
+                                            <ChevronDown className="mr-2 h-4 w-4"/>
+                                        )}
+                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
