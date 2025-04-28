@@ -1,9 +1,10 @@
 'use client';
-import {Customer, useSalesStore} from "@/lib/stores/saleStore";
+import {useSalesStore} from "@/lib/stores/saleStore";
 import {useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {
     CheckCircle,
+    ChevronDown,
     CreditCard,
     Package,
     PlusCircle,
@@ -15,7 +16,7 @@ import {
     UserPlus,
     X
 } from 'lucide-react';
-import {addDoc, collection, doc, getDocs, orderBy, query, Timestamp, updateDoc} from 'firebase/firestore';
+import {addDoc, collection, doc, Timestamp, updateDoc} from 'firebase/firestore';
 import {db} from '@/lib/firebase';
 import {theme} from '@/lib/colorPattern';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
@@ -24,8 +25,9 @@ import {Input} from '@/components/ui/input';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {toast} from 'sonner';
 import {Separator} from '@/components/ui/separator';
-import {ProductType} from "@/lib/types/productType";
 import ProductCard from "@/components/sales/ProductCard";
+import {useInView} from 'react-intersection-observer';
+import {useCustomers, useFilteredProducts, useProducts} from '@/lib/queries/saleQueries';
 
 type CurrencyCode = 'USD' | 'THB' | 'KHR';
 
@@ -36,10 +38,7 @@ const CONVERSION_RATES: Record<CurrencyCode, number> = {
 };
 
 export default function SalesPage() {
-    const [products, setProducts] = useState<ProductType[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [currency, setCurrency] = useState<CurrencyCode>('USD');
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -52,8 +51,46 @@ export default function SalesPage() {
     const [saleComplete, setSaleComplete] = useState(false);
     const [saleId, setSaleId] = useState('');
 
-    const {cart, addToCart, removeFromCart, updateQuantity, clearCart, getTotal} = useSalesStore();
+    const {data: customersData, isLoading: isLoadingCustomers} = useCustomers();
+    const {data: filteredProductsData, isLoading: isLoadingFiltered} = useFilteredProducts(searchQuery);
+
+    const {
+        data: productsData,
+        fetchNextPage,
+        hasNextPage,
+        isLoading: isLoadingProducts,
+        isFetchingNextPage
+    } = useProducts();
+
+    const {ref, inView} = useInView();
+
+    useEffect(() => {
+        if (inView && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+    const {
+        cart,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        getTotal,
+        setSelectedCustomer,
+        selectedCustomer
+    } = useSalesStore();
     const router = useRouter();
+
+
+    useEffect(() => {
+        if (customersData && selectedCustomer) {
+            const customer = customersData.find(c => c.customerId === selectedCustomer.customerId);
+            if (customer) {
+                setSelectedCustomer(customer);
+            }
+        }
+    }, [customersData, selectedCustomer, setSelectedCustomer]);
 
     const currencySymbols: Record<CurrencyCode, string> = {
         'USD': '$',
@@ -61,49 +98,16 @@ export default function SalesPage() {
         'KHR': '៛'
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const productsQuery = query(collection(db, 'products'), orderBy('productName'));
-                const productsSnapshot = await getDocs(productsQuery);
-                const productsList = productsSnapshot.docs.map(doc => ({
-                    productId: doc.id,
-                    ...doc.data()
-                })) as ProductType[];
-                setProducts(productsList);
-
-                const customersQuery = query(collection(db, 'customers'), orderBy('name'));
-                const customersSnapshot = await getDocs(customersQuery);
-                const customersList = customersSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                })) as Customer[];
-                setCustomers(customersList);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                toast.error('Failed to load products and customers', {
-                    description: 'Error'
-                });
-            }
-        };
-
-        fetchData();
-    }, []);
-
     const convertCurrency = (amount: number, fromCurrency: CurrencyCode = 'USD', toCurrency: CurrencyCode = currency): number => {
         if (fromCurrency === toCurrency) return amount;
-
-        // Convert to USD first (if not already in USD)
         const amountInUSD = fromCurrency === 'USD' ? amount : amount / CONVERSION_RATES[fromCurrency];
-
-        // Then convert to target currency
         return amountInUSD * CONVERSION_RATES[toCurrency];
     };
 
-    const filteredProducts = products.filter(product =>
-        product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+
+    const displayProducts = searchQuery ?
+        (filteredProductsData || []) :
+        productsData?.pages.flatMap(page => page.products) || [];
 
     const handleAddCustomer = async () => {
         if (!newCustomer.name || !newCustomer.phone) {
@@ -129,7 +133,6 @@ export default function SalesPage() {
                 ...customerData
             };
 
-            setCustomers(prev => [...prev, newCustomerWithId]);
             setSelectedCustomer(newCustomerWithId);
             setIsAddingCustomer(false);
             setNewCustomer({name: '', phone: '', address: ''});
@@ -166,7 +169,7 @@ export default function SalesPage() {
                     productId: item.productId,
                     quantity: item.quantity,
                     price: item.price,
-                    priceSold: convertCurrency(item.price, 'USD', currency) + getCurrencySymbol()// Price in selected currency
+                    priceSold: convertCurrency(item.price, 'USD', currency)
                 })),
                 totalAmount: totalUSD.toString(),
                 totalAmountInSelectedCurrency: getTotal().toString(),
@@ -180,7 +183,7 @@ export default function SalesPage() {
             setSaleId(saleRef.id);
 
             const updatePromises = cart.map(item => {
-                const productDoc = products.find(p => p.productId === item.productId);
+                const productDoc = displayProducts.find(p => p.productId === item.productId);
                 if (productDoc) {
                     const newStock = productDoc.stock - item.quantity;
                     return updateDoc(doc(db, 'products', productDoc.productId), {
@@ -213,12 +216,10 @@ export default function SalesPage() {
         setSaleId('');
     };
 
-    // Get currency symbol based on selected currency
     const getCurrencySymbol = (): string => {
         return currencySymbols[currency];
     };
 
-    // Get total in specified currency
     const getTotalInCurrency = (targetCurrency: CurrencyCode = currency): number => {
         return cart.reduce((sum, item) => {
             const itemTotalInCurrency = convertCurrency(item.price * item.quantity, 'USD', targetCurrency);
@@ -226,7 +227,7 @@ export default function SalesPage() {
         }, 0);
     };
 
-    // Success view after completing a sale
+
     if (saleComplete) {
         return (
             <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
@@ -268,9 +269,10 @@ export default function SalesPage() {
         <div className="flex flex-col lg:flex-row h-full gap-6">
             <div className="flex-1 flex flex-col">
                 <div className="mb-4">
-                    <h1 className="text-2xl font-bold mb-4" style={{color: theme.primary}}>
+                    <h1 className="flex text-2xl font-bold mb-4" style={{color: theme.primary}}>
                         Products
                     </h1>
+
                     <div className="relative">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
                         <Input
@@ -284,24 +286,52 @@ export default function SalesPage() {
 
                 <div
                     className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4">
-                    {filteredProducts.map((product) => (
-                        <ProductCard
-                            key={product.productId}
-                            product={{
-                                ...product,
-                                // Convert price for display purposes
-                                displayPrice: convertCurrency(product.price, 'USD', currency)
-                            }}
-                            addToCartAction={addToCart}
-                            currencySymbol={getCurrencySymbol()}
-                        />
-                    ))}
-                    {filteredProducts.length === 0 && (
+                    {isLoadingProducts || isLoadingFiltered ? (
+                        <div className="col-span-full flex items-center justify-center h-40">
+                            <p style={{color: theme.text}}>Loading products...</p>
+                        </div>
+                    ) : displayProducts.length === 0 ? (
                         <div className="col-span-full flex items-center justify-center h-40 text-center">
                             <p style={{color: theme.text}}>
                                 No products found. Try a different search term.
                             </p>
                         </div>
+                    ) : (
+                        <>
+                            {displayProducts.map((product) => (
+                                <ProductCard
+                                    key={product.productId}
+                                    product={{
+                                        ...product,
+                                        displayPrice: convertCurrency(product.price, 'USD', currency)
+                                    }}
+                                    addToCartAction={addToCart}
+                                    currencySymbol={getCurrencySymbol()}
+                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
+                                />
+                            ))}
+
+
+                            {!searchQuery && hasNextPage && (
+                                <div
+                                    ref={ref}
+                                    className="col-span-full flex justify-center my-4"
+                                >
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => fetchNextPage()}
+                                        disabled={isFetchingNextPage}
+                                    >
+                                        {isFetchingNextPage ? (
+                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>
+                                        ) : (
+                                            <ChevronDown className="mr-2 h-4 w-4"/>
+                                        )}
+                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
+                                    </Button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -325,7 +355,7 @@ export default function SalesPage() {
                                     <Select
                                         value={selectedCustomer?.customerId || ''}
                                         onValueChange={(value) => {
-                                            const customer = customers.find(c => c.customerId === value);
+                                            const customer = customersData?.find(c => c.customerId === value);
                                             setSelectedCustomer(customer || null);
                                         }}
                                     >
@@ -333,11 +363,15 @@ export default function SalesPage() {
                                             <SelectValue placeholder="Select a customer"/>
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {customers.map((customer) => (
-                                                <SelectItem key={customer.customerId} value={customer.customerId}>
-                                                    {customer.name} ({customer.phone})
-                                                </SelectItem>
-                                            ))}
+                                            {isLoadingCustomers ? (
+                                                <SelectItem value="loading" disabled>Loading customers...</SelectItem>
+                                            ) : (
+                                                customersData?.map((customer) => (
+                                                    <SelectItem key={customer.customerId} value={customer.customerId}>
+                                                        {customer.name} ({customer.phone})
+                                                    </SelectItem>
+                                                ))
+                                            )}
                                         </SelectContent>
                                     </Select>
 
@@ -417,6 +451,7 @@ export default function SalesPage() {
 
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
 
+                        {/* Rest of the component remains the same */}
                         {/* Payment method and Currency */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
@@ -474,7 +509,6 @@ export default function SalesPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {cart.map((item) => {
-                                        // Convert price for display
                                         const priceInSelectedCurrency = convertCurrency(item.price, 'USD', currency);
                                         const itemTotalInSelectedCurrency = priceInSelectedCurrency * item.quantity;
 

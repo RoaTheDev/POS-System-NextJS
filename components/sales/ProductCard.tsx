@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -9,17 +9,44 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { theme } from '@/lib/colorPattern';
 import { ProductType } from '@/lib/types/productType';
+import { cloudinaryImageLoader, getImageFromCache, saveImageToCache } from '@/lib/imageCache';
 
 interface ProductCardProps {
     product: ProductType & { displayPrice?: number };
     addToCartAction: (product: ProductType, quantity: number) => void;
     currencySymbol?: string;
+    cart: number
 }
 
-export default function ProductCard({ product, addToCartAction, currencySymbol = '$' }: ProductCardProps) {
+export default function ProductCard({ product, addToCartAction, currencySymbol = '$' , cart}: ProductCardProps) {
     const [quantity, setQuantity] = useState(1);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [isImageCached, setIsImageCached] = useState(false);
 
     const priceToDisplay = product.displayPrice !== undefined ? product.displayPrice : product.price;
+    const cacheKey = `product_img_${product.productId}`;
+
+    useEffect(() => {
+        const checkImageCache = async () => {
+            if (product.productImgUrl) {
+                const cachedImageUrl = await getImageFromCache(cacheKey);
+                if (cachedImageUrl) {
+                    setImageLoaded(true);
+                    setIsImageCached(true);
+                }
+            }
+        };
+
+         checkImageCache();
+    }, [product.productImgUrl, cacheKey]);
+
+    const handleImageLoad = async () => {
+        setImageLoaded(true);
+
+        if (product.productImgUrl && !isImageCached) {
+            await saveImageToCache(cacheKey, product.productImgUrl);
+        }
+    };
 
     return (
         <Card className="flex flex-col h-full">
@@ -29,9 +56,11 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                         src={product.productImgUrl}
                         alt={product.productName}
                         fill
-                        className="object-cover"
+                        className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                         sizes="(max-width: 768px) 100vw, 300px"
                         priority={false}
+                        loader={cloudinaryImageLoader}
+                        onLoad={handleImageLoad}
                         onError={() => console.error(`Failed to load image: ${product.productImgUrl}`)}
                     />
                 ) : (
@@ -39,7 +68,12 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                         <Package size={40} className="text-gray-500" />
                     </div>
                 )}
+
+                {product.productImgUrl && !imageLoaded && (
+                    <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+                )}
             </div>
+
             <CardHeader className="pb-2">
                 <CardTitle className="text-base truncate" style={{ color: theme.text }}>
                     {product.productName}
@@ -53,6 +87,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                     </Badge>
                 </CardDescription>
             </CardHeader>
+
             <CardContent className="pb-2 flex-grow">
                 <p className="text-lg font-bold" style={{ color: theme.primary }}>
                     {currencySymbol}{priceToDisplay.toFixed(2)}
@@ -61,6 +96,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                     In stock: {product.stock}
                 </p>
             </CardContent>
+
             <CardFooter>
                 <div className="flex space-x-2 w-full">
                     <Input
@@ -68,7 +104,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                         min="1"
                         max={product.stock}
                         value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        onChange={(e) => setQuantity(Math.min(Number(e.target.value), product.stock))}
                         className="w-20"
                     />
                     <Button
@@ -84,9 +120,9 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                                 toast.error('Quantity exceeds available stock');
                             }
                         }}
-                        disabled={product.stock <= 0}
+                        disabled={product.stock <= cart}
                     >
-                        <Plus size={16} className="mr-1" /> Add
+                        <Plus size={16} className="mr-1"/> Add
                     </Button>
                 </div>
             </CardFooter>

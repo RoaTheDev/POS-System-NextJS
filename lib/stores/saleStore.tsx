@@ -1,7 +1,6 @@
-import { create } from 'zustand'
-import { Timestamp } from 'firebase/firestore'
+import {create} from 'zustand'
+import {Timestamp} from 'firebase/firestore'
 import {ProductType} from "@/lib/types/productType";
-
 
 
 export interface Customer {
@@ -51,38 +50,41 @@ interface SalesStore {
     setRecentSales: (sales: Sale[]) => void
     addSale: (sale: Sale) => void
 
-    // Selected customer
     selectedCustomer: Customer | null
     setSelectedCustomer: (customer: Customer | null) => void
 }
 
 export const useSalesStore = create<SalesStore>((set, get) => ({
-    // Cart state
     cart: [],
     addToCart: (product, quantity) => {
         set((state) => {
-            const existingItem = state.cart.find(item => item.productId === product.productId)
+            const existingItem = state.cart.find(item => item.productId === product.productId);
 
             if (existingItem) {
+                const newQuantity = Math.min(existingItem.quantity + quantity, product.stock);
                 return {
                     cart: state.cart.map(item =>
                         item.productId === product.productId
-                            ? { ...item, quantity: item.quantity + quantity }
+                            ? { ...item, quantity: newQuantity }
                             : item
-                    )
-                }
+                    ),
+                };
             } else {
+                const validQuantity = Math.min(quantity, product.stock);
                 return {
-                    cart: [...state.cart, {
-                        productId: product.productId,
-                        productName: product.productName,
-                        quantity,
-                        price: product.price,
-                        stock: product.stock
-                    }]
-                }
+                    cart: [
+                        ...state.cart,
+                        {
+                            productId: product.productId,
+                            productName: product.productName,
+                            quantity: validQuantity,
+                            price: product.price,
+                            stock: product.stock,
+                        },
+                    ],
+                };
             }
-        })
+        });
     },
     removeFromCart: (productId) => {
         set((state) => ({
@@ -93,32 +95,30 @@ export const useSalesStore = create<SalesStore>((set, get) => ({
         set((state) => ({
             cart: state.cart.map(item =>
                 item.productId === productId
-                    ? { ...item, quantity: quantity }
+                    ? {...item, quantity: quantity}
                     : item
             )
         }))
     },
     clearCart: () => {
-        set({ cart: [] })
+        set({cart: []})
     },
     getTotal: () => {
         return get().cart.reduce((total, item) => total + (item.price * item.quantity), 0)
     },
 
-    // Recent sales
     recentSales: [],
     setRecentSales: (sales) => {
-        set({ recentSales: sales })
+        set({recentSales: sales})
     },
     addSale: (sale) => {
         set((state) => ({
-            recentSales: [sale, ...state.recentSales].slice(0, 10) // Keep only 10 most recent
+            recentSales: [sale, ...state.recentSales].slice(0, 10)
         }))
     },
 
-    // Selected customer
     selectedCustomer: null,
     setSelectedCustomer: (customer) => {
-        set({ selectedCustomer: customer })
+        set({selectedCustomer: customer})
     }
 }))

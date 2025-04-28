@@ -39,7 +39,7 @@ export default function SalesHistoryPage() {
             try {
                 setLoading(true)
 
-                // Fetch customers for mapping
+
                 const customersQuery = query(collection(db, 'customers'))
                 const customersSnapshot = await getDocs(customersQuery)
                 const customersMap: Record<string, Customer> = {}
@@ -52,8 +52,6 @@ export default function SalesHistoryPage() {
                     }
                 })
                 setCustomers(customersMap)
-
-                // Fetch products for mapping
                 const productsQuery = query(collection(db, 'products'))
                 const productsSnapshot = await getDocs(productsQuery)
                 const productsMap: Record<string, ProductType> = {}
@@ -69,17 +67,21 @@ export default function SalesHistoryPage() {
                 const salesSnapshot = await getDocs(salesQuery)
 
                 const salesData = salesSnapshot.docs.map(doc => {
-                    const data = doc.data() as Sale
+                    const data = doc.data() as Sale;
                     return {
-                        id: doc.id,
-                        ...data,
-                        customerName: customersMap[data.customerId]?.name || 'Unknown',
+                        id: doc.id, // Use Firestore document ID
+                        saleId: data.saleId,
+                        customerId: data.customerId,
                         products: data.products.map(product => ({
                             ...product,
                             productName: productsMap[product.productId]?.productName || 'Unknown ProductType'
-                        }))
-                    }
-                })
+                        })),
+                        totalAmount: data.totalAmount,
+                        paymentMethod: data.paymentMethod,
+                        saleDate: data.saleDate,
+                        customerName: customersMap[data.customerId]?.name || 'Unknown'
+                    };
+                });
 
                 setSales(salesData)
             } catch (error) {
