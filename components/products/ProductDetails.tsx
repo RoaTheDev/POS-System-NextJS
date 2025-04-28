@@ -1,26 +1,25 @@
-'use client'
-import {theme} from "@/lib/colorPattern";
-import { Product } from '@/lib/types/product'
+'use client';
+import { theme } from "@/lib/colorPattern";
+import { ProductType } from '@/lib/types/productType';
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription, // Import DialogDescription
     DialogTrigger,
-} from "@/components/ui/dialog"
-import { Button } from '@/components/ui/button'
-import { Eye, Package } from 'lucide-react'
-import { formatDistance } from 'date-fns'
+} from "@/components/ui/dialog";
+import { Button } from '@/components/ui/button';
+import { Eye, Package } from 'lucide-react';
+import { formatDistance } from 'date-fns';
 import Image from "next/image";
 
-
-
 interface ProductDetailsProps {
-    product: Product
+    product: ProductType;
 }
 
 export default function ProductDetails({ product }: ProductDetailsProps) {
-    const createdDate = product.createdAt?.toDate ? product.createdAt.toDate() : new Date()
+    const createdDate = product.createdAt?.toDate ? product.createdAt.toDate() : new Date();
 
     return (
         <Dialog>
@@ -30,7 +29,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                     size="sm"
                     style={{
                         borderColor: theme.accent,
-                        color: theme.text
+                        color: theme.text,
                     }}
                 >
                     <Eye size={14} />
@@ -39,6 +38,9 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle style={{ color: theme.text }}>Product Details</DialogTitle>
+                    <DialogDescription>
+                        View the details of the {product.productName} product, including price, stock, and description.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                     <div className="flex items-center justify-center">
@@ -63,7 +65,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                             className="px-2 py-1 rounded-full text-xs inline-block mt-1"
                             style={{
                                 backgroundColor: theme.secondary,
-                                color: theme.text
+                                color: theme.text,
                             }}
                         >
               {product.categoryName}
@@ -96,5 +98,5 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                 </div>
             </DialogContent>
         </Dialog>
-    )
+    );
 }

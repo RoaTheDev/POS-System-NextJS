@@ -1,6 +1,6 @@
-import { Timestamp } from 'firebase/firestore';
+import {Timestamp} from 'firebase/firestore';
 
-export interface Product {
+export interface ProductType {
     productId: string;
     productName: string;
     categoryName: string;
@@ -8,6 +8,7 @@ export interface Product {
     productImgUrl: string;
     stock: number;
     description: string;
+    cloudinaryPublicId?: string;
     createdAt: Timestamp;
 }
 
@@ -17,5 +18,5 @@ export interface ProductFormData {
     price: number;
     stock: number;
     description?: string;
-    productImage?: File ;
+    productImage?: File;
 }

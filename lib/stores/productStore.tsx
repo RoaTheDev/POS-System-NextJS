@@ -11,10 +11,9 @@ import {
     where,
     Timestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
-import { Product, ProductFormData } from '@/lib/types/product';
-import {FirebaseError} from "@firebase/util";
+import { db } from '@/lib/firebase';
+import { ProductType, ProductFormData } from '@/lib/types/productType';
+import { FirebaseError } from "@firebase/util";
 
 interface AppError {
     message: string;
@@ -26,34 +25,86 @@ const handleError = (error: unknown): AppError => {
     const defaultMessage = 'An unexpected error occurred. Please try again.';
 
     if (error instanceof Error) {
-        switch ((error as FirebaseError).code) {
-            case 'storage/permission-denied':
-                return { message: 'Permission denied while accessing storage.', code: 'PERMISSION_DENIED', severity: 'error' };
-            case 'firestore/permission-denied':
-                return { message: 'You do not have permission to perform this action.', code: 'PERMISSION_DENIED', severity: 'error' };
-            case 'storage/object-not-found':
-                return { message: 'The file could not be found.', code: 'FILE_NOT_FOUND', severity: 'warning' };
-            case 'firestore/not-found':
-                return { message: 'The requested products was not found.', code: 'NOT_FOUND', severity: 'warning' };
-            default:
-                return { message: defaultMessage, code: (error as FirebaseError).code, severity: 'error' };
+        if ((error as FirebaseError).code) {
+            switch ((error as FirebaseError).code) {
+                case 'firestore/permission-denied':
+                    return { message: 'You do not have permission to perform this action.', code: 'PERMISSION_DENIED', severity: 'error' };
+                case 'firestore/not-found':
+                    return { message: 'The requested product was not found.', code: 'NOT_FOUND', severity: 'warning' };
+                default:
+                    return { message: defaultMessage, code: (error as FirebaseError).code, severity: 'error' };
+            }
         }
+        return { message: error.message, severity: 'error' };
     }
 
     return { message: defaultMessage, severity: 'error' };
 };
 
 interface ProductState {
-    products: Product[];
+    products: ProductType[];
     isLoading: boolean;
     error: AppError | null;
     fetchProducts: () => Promise<void>;
     addProduct: (productData: ProductFormData) => Promise<void>;
-    updateProduct: (productId: string, productData: ProductFormData) => Promise<void>;
-    deleteProduct: (productId: string) => Promise<void>;
+    updateProduct: (id: string, productData: ProductFormData) => Promise<void>;
+    deleteProduct: (id: string) => Promise<void>;
     searchProducts: (searchTerm: string, category?: string) => Promise<void>;
-    clearError: () => void; // New method to clear errors
+    clearError: () => void;
 }
+
+// Helper function to upload image to Cloudinary
+const uploadToCloudinary = async (file: File): Promise<{ url: string, publicId: string }> => {
+    try {
+        // Create a FormData instance
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '');
+        formData.append('folder', 'products');
+
+        // Make the upload request to Cloudinary
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+            {
+                method: 'POST',
+                body: formData
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to upload image to Cloudinary');
+        }
+
+        const data = await response.json();
+        return {
+            url: data.secure_url,
+            publicId: data.public_id
+        };
+    } catch (error) {
+        console.error('Cloudinary upload error:', error);
+        throw error;
+    }
+};
+
+// Helper function to delete image from Cloudinary
+const deleteFromCloudinary = async (publicId: string): Promise<void> => {
+    try {
+        const response = await fetch('/api/cloudinary/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ publicId }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete image from Cloudinary');
+        }
+    } catch (error) {
+        console.warn('Failed to delete image from Cloudinary:', error);
+        // Non-critical error, we can continue
+    }
+};
 
 export const useProductStore = create<ProductState>((set, get) => ({
     products: [],
@@ -69,8 +120,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
             const q = query(productsRef, orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
 
-            const productsData: Product[] = querySnapshot.docs.map((doc) => ({
-                ...(doc.data() as Omit<Product, 'productId'>),
+            const productsData: ProductType[] = querySnapshot.docs.map((doc) => ({
+                ...(doc.data() as Omit<ProductType,'productId'>),
                 productId: doc.id,
             }));
 
@@ -87,11 +138,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             let productImgUrl = '';
+            let cloudinaryPublicId = '';
 
             if (productData.productImage) {
-                const storageRef = ref(storage, `products/${Date.now()}_${productData.productImage.name}`);
-                await uploadBytes(storageRef, productData.productImage);
-                productImgUrl = await getDownloadURL(storageRef);
+                const uploadResult = await uploadToCloudinary(productData.productImage);
+                productImgUrl = uploadResult.url;
+                cloudinaryPublicId = uploadResult.publicId;
             }
 
             await addDoc(collection(db, 'products'), {
@@ -101,6 +153,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 stock: Number(productData.stock),
                 description: productData.description,
                 productImgUrl,
+                cloudinaryPublicId, // Store the Cloudinary public ID for later deletion if needed
                 createdAt: Timestamp.now(),
             });
 
@@ -124,21 +177,23 @@ export const useProductStore = create<ProductState>((set, get) => ({
             }
 
             let productImgUrl = currentProduct.productImgUrl;
+            let cloudinaryPublicId = currentProduct.cloudinaryPublicId || '';
 
             if (productData.productImage) {
-                if (productImgUrl) {
+                // Delete old image if it exists
+                if (cloudinaryPublicId) {
                     try {
-                        const oldImageRef = ref(storage, productImgUrl);
-                        await deleteObject(oldImageRef);
+                        await deleteFromCloudinary(cloudinaryPublicId);
                     } catch (error) {
-                        // Log non-critical error but continue
                         console.warn('Failed to delete old image:', error);
+                        // Non-critical error, continue with upload
                     }
                 }
 
-                const storageRef = ref(storage, `products/${Date.now()}_${productData.productImage.name}`);
-                await uploadBytes(storageRef, productData.productImage);
-                productImgUrl = await getDownloadURL(storageRef);
+                // Upload new image
+                const uploadResult = await uploadToCloudinary(productData.productImage);
+                productImgUrl = uploadResult.url;
+                cloudinaryPublicId = uploadResult.publicId;
             }
 
             await updateDoc(productRef, {
@@ -148,6 +203,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 stock: Number(productData.stock),
                 description: productData.description,
                 productImgUrl,
+                cloudinaryPublicId,
             });
 
             await get().fetchProducts();
@@ -169,12 +225,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 throw new Error('Product not found');
             }
 
-            if (currentProduct.productImgUrl) {
+            // Delete image from Cloudinary if it exists
+            if (currentProduct.cloudinaryPublicId) {
                 try {
-                    const imageRef = ref(storage, currentProduct.productImgUrl);
-                    await deleteObject(imageRef);
+                    await deleteFromCloudinary(currentProduct.cloudinaryPublicId);
                 } catch (error) {
-                    console.warn('Failed to delete image:', error);
+                    console.warn('Failed to delete image from Cloudinary:', error);
+                    // Non-critical error, continue with document deletion
                 }
             }
 
@@ -201,8 +258,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
             const querySnapshot = await getDocs(q);
 
-            const productsData: Product[] = querySnapshot.docs.map((doc) => ({
-                ...(doc.data() as Omit<Product, 'productId'>),
+            const productsData: ProductType[] = querySnapshot.docs.map((doc) => ({
+                ...(doc.data() as Omit<ProductType, 'productId'>),
                 productId: doc.id,
             }));
 
@@ -210,7 +267,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 ? productsData.filter(
                     (product) =>
                         product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+                        (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
                 )
                 : productsData;
 
