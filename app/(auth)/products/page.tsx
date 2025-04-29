@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {toast, Toaster} from 'sonner';
 import ProductForm from '@/components/products/ProductForm';
-import {Edit, Package, Plus, Search, Trash2, User} from 'lucide-react';
+import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
 import Image from 'next/image';
 import Pagination from '@/components/common/Pagination';
 
@@ -135,7 +135,7 @@ export default function ProductsPage() {
     const handleItemsPerPageChange = (value: string) => {
         const newItemsPerPage = parseInt(value, 10);
         setItemsPerPage(newItemsPerPage);
-        setCurrentPage(1); // Reset to first page when changing items per page
+        setCurrentPage(1);
     };
 
     return (
@@ -152,23 +152,6 @@ export default function ProductsPage() {
             />
 
             <div className='flex-1 flex flex-col overflow-hidden'>
-                <header className='bg-white shadow-sm z-10' style={{backgroundColor: theme.light}}>
-                    <div className='px-4 py-4 flex items-center justify-between'>
-                        <div className='lg:hidden'>
-                            <h1 className='text-lg font-bold' style={{color: theme.primary}}>Elizabeth Rose POS</h1>
-                        </div>
-
-                        <div className='flex items-center space-x-3'>
-                            <div
-                                className='w-8 h-8 rounded-full flex items-center justify-center'
-                                style={{backgroundColor: theme.secondary}}
-                            >
-                                <User size={16} style={{color: theme.primary}}/>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
                 <main className='flex-1 overflow-y-auto p-4 pb-20 lg:pb-0'>
                     <div className='space-y-6'>
                         <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6'>
@@ -357,7 +340,7 @@ export default function ProductsPage() {
                                     </table>
                                 </div>
 
-                                {/* Use the Pagination component */}
+
                                 <Pagination
                                     currentPage={currentPage}
                                     totalPages={totalPages}
@@ -370,7 +353,6 @@ export default function ProductsPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Edit Product Dialog */}
                         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                             <DialogContent className='sm:max-w-[600px]'>
                                 <DialogHeader>

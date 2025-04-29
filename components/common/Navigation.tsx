@@ -1,14 +1,12 @@
 'use client'
 
 import {usePathname, useRouter} from 'next/navigation'
-import {Home, LogOut, Package, ShoppingCart, User, User2} from 'lucide-react'
+import {Home, Package, ShoppingCart, User2} from 'lucide-react'
 import {theme} from '@/lib/colorPattern'
-import {useAuth} from '@/lib/stores/AuthContext'
 
 export default function Navigation() {
     const pathname = usePathname()
     const router = useRouter()
-    const {logout, user} = useAuth()
 
     const navItems = [
         {name: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard'},
@@ -19,9 +17,7 @@ export default function Navigation() {
 
     const activePage = navItems.find(item => pathname === item.path)?.name || 'dashboard'
 
-    const handleLogout = async () => {
-        await logout()
-    }
+
 
     const Sidebar = () => (
         <div
@@ -54,29 +50,7 @@ export default function Navigation() {
                     ))}
                 </ul>
             </nav>
-            <div className="absolute bottom-0 w-64 p-4 border-t" style={{borderColor: theme.secondary}}>
-                <div className="flex items-center">
-                    <div
-                        className="w-10 h-10 rounded-full mr-3 flex items-center justify-center"
-                        style={{backgroundColor: theme.secondary}}
-                    >
-                        <User size={20} style={{color: theme.primary}}/>
-                    </div>
-                    <div>
-                        <p className="font-medium" style={{color: theme.text}}>
-                            {user?.email?.split('@')[0] || 'Staff User'}
-                        </p>
-                        <button
-                            className="text-sm flex items-center"
-                            style={{color: theme.primary}}
-                            onClick={handleLogout}
-                        >
-                            <LogOut size={14} className="mr-1"/>
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
+
         </div>
     )
 

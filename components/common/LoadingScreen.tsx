@@ -10,7 +10,6 @@ export default function LoadingScreen() {
         >
             <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
-                    {/* Outer spinning circle */}
                     <div
                         className="w-20 h-20 rounded-full border-4 border-t-transparent border-r-transparent animate-spin"
                         style={{
@@ -19,7 +18,6 @@ export default function LoadingScreen() {
                         }}
                     />
 
-                    {/* Inner pulsating dot */}
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div
                             className="w-6 h-6 rounded-full animate-ping"
@@ -28,7 +26,6 @@ export default function LoadingScreen() {
                     </div>
                 </div>
 
-                {/* Loading Title */}
                 <h2
                     className="text-2xl font-bold animate-fade-in"
                     style={{ color: theme.primary }}
@@ -36,7 +33,6 @@ export default function LoadingScreen() {
                     Mai Sophany Sound
                 </h2>
 
-                {/* Loading Subtitle */}
                 <p
                     className="text-sm opacity-80 animate-fade-in-delay"
                     style={{ color: theme.text }}

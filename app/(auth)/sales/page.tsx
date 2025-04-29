@@ -1,10 +1,11 @@
 'use client';
-import {useSalesStore} from "@/lib/stores/saleStore";
-import {useEffect, useState} from 'react';
-import {useRouter} from 'next/navigation';
+import { useSalesStore } from "@/lib/stores/saleStore";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     CheckCircle,
     ChevronDown,
+    ChevronUp,
     CreditCard,
     Package,
     PlusCircle,
@@ -16,18 +17,18 @@ import {
     UserPlus,
     X
 } from 'lucide-react';
-import {addDoc, collection, doc, Timestamp, updateDoc} from 'firebase/firestore';
-import {db} from '@/lib/firebase';
-import {theme} from '@/lib/colorPattern';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
-import {toast} from 'sonner';
-import {Separator} from '@/components/ui/separator';
+import { addDoc, collection, doc, Timestamp, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { theme } from '@/lib/colorPattern';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Separator } from '@/components/ui/separator';
 import ProductCard from "@/components/sales/ProductCard";
-import {useInView} from 'react-intersection-observer';
-import {useCustomers, useFilteredProducts, useProducts} from '@/lib/queries/saleQueries';
+import { useInView } from 'react-intersection-observer';
+import { useCustomers, useFilteredProducts, useProducts } from '@/lib/queries/saleQueries';
 import Link from "next/link";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -55,9 +56,10 @@ export default function SalesPage() {
     const [saleComplete, setSaleComplete] = useState(false);
     const [saleId, setSaleId] = useState('');
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
+    const [isSaleSummaryExpanded, setIsSaleSummaryExpanded] = useState(false); // New state for mobile expansion
 
-    const {data: customersData, isLoading: isLoadingCustomers} = useCustomers();
-    const {data: filteredProductsData, isLoading: isLoadingFiltered} = useFilteredProducts(searchQuery);
+    const { data: customersData, isLoading: isLoadingCustomers } = useCustomers();
+    const { data: filteredProductsData, isLoading: isLoadingFiltered } = useFilteredProducts(searchQuery);
 
     const {
         data: productsData,
@@ -67,7 +69,7 @@ export default function SalesPage() {
         isFetchingNextPage
     } = useProducts();
 
-    const {ref, inView} = useInView();
+    const { ref, inView } = useInView();
 
     useEffect(() => {
         if (inView && hasNextPage && !isFetchingNextPage) {
@@ -102,7 +104,6 @@ export default function SalesPage() {
         'KHR': '៛'
     };
 
-    // Filter customers based on search query
     const filteredCustomers = customersData?.filter(customer => {
         if (!customerSearchQuery) return true;
         const query = customerSearchQuery.toLowerCase();
@@ -148,7 +149,7 @@ export default function SalesPage() {
 
             setSelectedCustomer(newCustomerWithId);
             setIsAddingCustomer(false);
-            setNewCustomer({name: '', phone: '', address: ''});
+            setNewCustomer({ name: '', phone: '', address: '' });
 
             toast.success('Customer added successfully');
         } catch (error) {
@@ -227,6 +228,7 @@ export default function SalesPage() {
         setCurrency('USD');
         setSaleComplete(false);
         setSaleId('');
+        setIsSaleSummaryExpanded(false);
     };
 
     const getCurrencySymbol = (): string => {
@@ -245,32 +247,32 @@ export default function SalesPage() {
             <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
                 <div
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                    style={{backgroundColor: theme.secondary}}
+                    style={{ backgroundColor: theme.secondary }}
                 >
-                    <CheckCircle size={32} style={{color: theme.primary}}/>
+                    <CheckCircle size={32} style={{ color: theme.primary }} />
                 </div>
-                <h1 className="text-2xl font-bold mb-2" style={{color: theme.primary}}>
+                <h1 className="text-2xl font-bold mb-2" style={{ color: theme.primary }}>
                     Sale Complete!
                 </h1>
-                <p className="mb-4" style={{color: theme.text}}>
+                <p className="mb-4" style={{ color: theme.text }}>
                     Sale ID: {saleId}
                 </p>
-                <p className="mb-6" style={{color: theme.text}}>
+                <p className="mb-6" style={{ color: theme.text }}>
                     Total Amount: {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)} {currency}
                 </p>
                 <div className="flex space-x-4">
                     <Button
                         variant="outline"
                         onClick={handleNewSale}
-                        style={{borderColor: theme.primary, color: theme.primary}}
+                        style={{ borderColor: theme.primary, color: theme.primary }}
                     >
-                        <RefreshCcw size={16} className="mr-2"/> New Sale
+                        <RefreshCcw size={16} className="mr-2" /> New Sale
                     </Button>
                     <Button
                         onClick={() => router.push('/sales/history')}
-                        style={{backgroundColor: theme.primary}}
+                        style={{ backgroundColor: theme.primary }}
                     >
-                        <ShoppingCart size={16} className="mr-2"/> View Sales
+                        <ShoppingCart size={16} className="mr-2" /> View Sales
                     </Button>
                 </div>
             </div>
@@ -279,14 +281,98 @@ export default function SalesPage() {
 
     return (
         <div className="flex flex-col lg:flex-row h-full gap-6 pb-20 lg:pb-0">
-            <div className="w-full lg:w-96 flex flex-col order-1 lg:order-2">
+            {/* Sale Management */}
+            <div className="flex-1 flex flex-col order-1">
+                <div className="mb-4">
+                    <div className="flex justify-between mb-2.5">
+                        <h1 className="text-2xl font-bold" style={{ color: theme.primary }}>
+                            <ShoppingCart className="inline mr-2 mb-1" size={24} />
+                            Sale Management
+                        </h1>
+                        <Link href="/sales/history">
+                            <Button variant="outline" style={{ borderColor: theme.primary, color: theme.primary }}>
+                                Sale History
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                        <Input
+                            placeholder="Search products..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+                <div
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4"
+                >
+                    {isLoadingProducts || isLoadingFiltered ? (
+                        <div className="col-span-full flex items-center justify-center h-40">
+                            <p style={{ color: theme.text }}>Loading products...</p>
+                        </div>
+                    ) : displayProducts.length === 0 ? (
+                        <div className="col-span-full flex items-center justify-center h-40 text-center">
+                            <p style={{ color: theme.text }}>
+                                No products found. Try a different search term.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            {displayProducts.map((product) => (
+                                <ProductCard
+                                    key={product.productId}
+                                    product={{
+                                        ...product,
+                                        displayPrice: convertCurrency(product.price, 'USD', currency)
+                                    }}
+                                    addToCartAction={addToCart}
+                                    currencySymbol={getCurrencySymbol()}
+                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
+                                />
+                            ))}
+                            {!searchQuery && hasNextPage && (
+                                <div
+                                    ref={ref}
+                                    className="col-span-full flex justify-center my-4"
+                                >
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => fetchNextPage()}
+                                        disabled={isFetchingNextPage}
+                                    >
+                                        {isFetchingNextPage ? (
+                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <ChevronDown className="mr-2 h-4 w-4" />
+                                        )}
+                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Sale Summary */}
+            <div className="w-full lg:w-96 flex flex-col order-2 lg:order-2 fixed bottom-16 lg:static lg:bottom-auto z-20 lg:z-auto bg-white lg:bg-transparent shadow-lg lg:shadow-none">
                 <Card className="flex-grow">
-                    <CardHeader>
-                        <CardTitle style={{color: theme.primary}}>Sale Summary</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between lg:block">
+                        <CardTitle style={{ color: theme.primary }}>Sale Summary</CardTitle>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="lg:hidden"
+                            onClick={() => setIsSaleSummaryExpanded(!isSaleSummaryExpanded)}
+                        >
+                            {isSaleSummaryExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                        </Button>
                     </CardHeader>
-                    <CardContent className="flex flex-col h-full">
+                    <CardContent className={`flex flex-col h-full ${isSaleSummaryExpanded ? 'block' : 'hidden lg:block'}`}>
                         <div className="mb-4">
-                            <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
+                            <label className="text-sm font-medium mb-2 block" style={{ color: theme.text }}>
                                 Customer
                             </label>
                             {!isAddingCustomer ? (
@@ -345,15 +431,15 @@ export default function SalesPage() {
                                         variant="outline"
                                         size="icon"
                                         onClick={() => setIsAddingCustomer(true)}
-                                        style={{borderColor: theme.primary, color: theme.primary}}
+                                        style={{ borderColor: theme.primary, color: theme.primary }}
                                     >
-                                        <UserPlus size={18}/>
+                                        <UserPlus size={18} />
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between mb-2">
-                                        <h4 className="font-medium" style={{color: theme.primary}}>
+                                        <h4 className="font-medium" style={{ color: theme.primary }}>
                                             New Customer
                                         </h4>
                                         <Button
@@ -361,49 +447,49 @@ export default function SalesPage() {
                                             variant="ghost"
                                             onClick={() => setIsAddingCustomer(false)}
                                         >
-                                            <X size={16}/>
+                                            <X size={16} />
                                         </Button>
                                     </div>
                                     <Input
                                         placeholder="Name"
                                         value={newCustomer.name}
-                                        onChange={(e) => setNewCustomer(prev => ({...prev, name: e.target.value}))}
+                                        onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
                                     />
                                     <Input
                                         placeholder="Phone"
                                         type="tel"
                                         value={newCustomer.phone}
-                                        onChange={(e) => setNewCustomer(prev => ({...prev, phone: e.target.value}))}
+                                        onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
                                     />
                                     <Input
                                         placeholder="Address (optional)"
                                         value={newCustomer.address}
-                                        onChange={(e) => setNewCustomer(prev => ({...prev, address: e.target.value}))}
+                                        onChange={(e) => setNewCustomer(prev => ({ ...prev, address: e.target.value }))}
                                     />
                                     <Button
                                         onClick={handleAddCustomer}
                                         disabled={loading}
-                                        style={{backgroundColor: theme.primary}}
+                                        style={{ backgroundColor: theme.primary }}
                                         className="w-full"
                                     >
-                                        <PlusCircle size={16} className="mr-2"/>
+                                        <PlusCircle size={16} className="mr-2" />
                                         Add Customer
                                     </Button>
                                 </div>
                             )}
                             {selectedCustomer && (
-                                <div className="mt-2 p-2 rounded-md" style={{backgroundColor: theme.light}}>
+                                <div className="mt-2 p-2 rounded-md" style={{ backgroundColor: theme.light }}>
                                     <div className="flex items-start">
-                                        <User size={16} className="mr-2 mt-1" style={{color: theme.primary}}/>
+                                        <User size={16} className="mr-2 mt-1" style={{ color: theme.primary }} />
                                         <div>
-                                            <p className="font-medium" style={{color: theme.text}}>
+                                            <p className="font-medium" style={{ color: theme.text }}>
                                                 {selectedCustomer.name}
                                             </p>
-                                            <p className="text-sm" style={{color: theme.text}}>
+                                            <p className="text-sm" style={{ color: theme.text }}>
                                                 {selectedCustomer.phone}
                                             </p>
                                             {selectedCustomer.address && (
-                                                <p className="text-sm" style={{color: theme.text}}>
+                                                <p className="text-sm" style={{ color: theme.text }}>
                                                     {selectedCustomer.address}
                                                 </p>
                                             )}
@@ -412,11 +498,11 @@ export default function SalesPage() {
                                 </div>
                             )}
                         </div>
-                        <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
+                        <Separator className="my-4" style={{ backgroundColor: theme.secondary }} />
                         {/* Payment method and Currency */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
-                                <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
+                                <label className="text-sm font-medium mb-2 block" style={{ color: theme.text }}>
                                     Payment Method
                                 </label>
                                 <Select
@@ -424,7 +510,7 @@ export default function SalesPage() {
                                     onValueChange={(value) => setPaymentMethod(value)}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue/>
+                                        <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="cash">Cash</SelectItem>
@@ -434,7 +520,7 @@ export default function SalesPage() {
                                 </Select>
                             </div>
                             <div>
-                                <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
+                                <label className="text-sm font-medium mb-2 block" style={{ color: theme.text }}>
                                     Currency
                                 </label>
                                 <Select
@@ -442,7 +528,7 @@ export default function SalesPage() {
                                     onValueChange={(value: CurrencyCode) => setCurrency(value)}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue/>
+                                        <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="USD">USD ($)</SelectItem>
@@ -452,15 +538,15 @@ export default function SalesPage() {
                                 </Select>
                             </div>
                         </div>
-                        <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
+                        <Separator className="my-4" style={{ backgroundColor: theme.secondary }} />
                         {/* Cart items */}
                         <div className="flex-grow overflow-y-auto mb-4">
-                            <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
+                            <label className="text-sm font-medium mb-2 block" style={{ color: theme.text }}>
                                 Cart Items
                             </label>
                             {cart.length === 0 ? (
-                                <div className="text-center py-8" style={{color: theme.text}}>
-                                    <Package size={32} className="mx-auto mb-2 opacity-50"/>
+                                <div className="text-center py-8" style={{ color: theme.text }}>
+                                    <Package size={32} className="mx-auto mb-2 opacity-50" />
                                     <p>Your cart is empty</p>
                                 </div>
                             ) : (
@@ -472,14 +558,14 @@ export default function SalesPage() {
                                             <div
                                                 key={item.productId}
                                                 className="flex items-center justify-between p-2 rounded-md"
-                                                style={{backgroundColor: theme.light}}
+                                                style={{ backgroundColor: theme.light }}
                                             >
                                                 <div className="flex-1">
-                                                    <p className="font-medium" style={{color: theme.text}}>
+                                                    <p className="font-medium" style={{ color: theme.text }}>
                                                         {item.productName}
                                                     </p>
                                                     <div className="flex items-center">
-                                                        <p className="text-sm" style={{color: theme.text}}>
+                                                        <p className="text-sm" style={{ color: theme.text }}>
                                                             {getCurrencySymbol()}{priceInSelectedCurrency.toFixed(2)} ×
                                                         </p>
                                                         <Input
@@ -493,7 +579,7 @@ export default function SalesPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-medium" style={{color: theme.primary}}>
+                                                    <p className="font-medium" style={{ color: theme.primary }}>
                                                         {getCurrencySymbol()}{itemTotalInSelectedCurrency.toFixed(2)}
                                                     </p>
                                                     <Button
@@ -502,7 +588,7 @@ export default function SalesPage() {
                                                         className="h-6 w-6"
                                                         onClick={() => removeFromCart(item.productId)}
                                                     >
-                                                        <Trash2 size={14} className="text-red-500"/>
+                                                        <Trash2 size={14} className="text-red-500" />
                                                     </Button>
                                                 </div>
                                             </div>
@@ -511,17 +597,17 @@ export default function SalesPage() {
                                 </div>
                             )}
                         </div>
-                        <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
+                        <Separator className="my-4" style={{ backgroundColor: theme.secondary }} />
                         {/* Exchange rate info */}
                         {currency !== 'USD' && (
-                            <div className="mb-4 text-sm" style={{color: theme.text}}>
+                            <div className="mb-4 text-sm" style={{ color: theme.text }}>
                                 <p>Exchange Rate: 1 USD = {CONVERSION_RATES[currency]} {currency}</p>
                             </div>
                         )}
                         {/* Total */}
                         <div className="flex justify-between items-center mb-4">
-                            <p className="font-medium" style={{color: theme.text}}>Total</p>
-                            <p className="text-xl font-bold" style={{color: theme.primary}}>
+                            <p className="font-medium" style={{ color: theme.text }}>Total</p>
+                            <p className="text-xl font-bold" style={{ color: theme.primary }}>
                                 {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)} {currency}
                             </p>
                         </div>
@@ -531,95 +617,50 @@ export default function SalesPage() {
                             size="lg"
                             disabled={cart.length === 0 || !selectedCustomer || loading}
                             onClick={handleCompleteSale}
-                            style={{backgroundColor: theme.primary}}
+                            style={{ backgroundColor: theme.primary }}
                         >
                             {loading ? (
                                 <div className="flex items-center">
-                                    <RefreshCcw size={18} className="mr-2 animate-spin"/> Processing...
+                                    <RefreshCcw size={18} className="mr-2 animate-spin" /> Processing...
                                 </div>
                             ) : (
                                 <div className="flex items-center">
-                                    <CreditCard size={18} className="mr-2"/> Complete Sale
+                                    <CreditCard size={18} className="mr-2" /> Complete Sale
                                 </div>
                             )}
                         </Button>
                     </CardContent>
-                </Card>
-            </div>
-
-            {/* Products - Appears second in mobile, first in desktop */}
-            <div className="flex-1 flex flex-col order-2 lg:order-1">
-                <div className="mb-4">
-                    <div className="flex justify-between mb-2.5">
-                        <h1 className="text-2xl font-bold" style={{color: theme.primary}}>
-                            <ShoppingCart className="inline mr-2 mb-1" size={24}/>
-                            Sale Management
-                        </h1>
-                        <Link href="/sales/history">
-                            <Button variant="outline" style={{borderColor: theme.primary, color: theme.primary}}>
-                                Sale History
-                            </Button>
-                        </Link>
-                    </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
-                        <Input
-                            placeholder="Search products..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                </div>
-                <div
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4"
-                >
-                    {isLoadingProducts || isLoadingFiltered ? (
-                        <div className="col-span-full flex items-center justify-center h-40">
-                            <p style={{color: theme.text}}>Loading products...</p>
-                        </div>
-                    ) : displayProducts.length === 0 ? (
-                        <div className="col-span-full flex items-center justify-center h-40 text-center">
-                            <p style={{color: theme.text}}>
-                                No products found. Try a different search term.
+                    {/* Compact Sale Summary for Mobile */}
+                    <div className={`lg:hidden p-4 border-t ${isSaleSummaryExpanded ? 'hidden' : 'block'}`} style={{ borderColor: theme.secondary, backgroundColor: theme.light }}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium" style={{ color: theme.text }}>
+                                    {selectedCustomer ? selectedCustomer.name : 'Select customer'}
+                                </p>
+                                <p className="text-sm" style={{ color: theme.text }}>
+                                    ({cart.length} items)
+                                </p>
+                            </div>
+                            <p className="text-lg font-bold" style={{ color: theme.primary }}>
+                                {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)}
                             </p>
                         </div>
-                    ) : (
-                        <>
-                            {displayProducts.map((product) => (
-                                <ProductCard
-                                    key={product.productId}
-                                    product={{
-                                        ...product,
-                                        displayPrice: convertCurrency(product.price, 'USD', currency)
-                                    }}
-                                    addToCartAction={addToCart}
-                                    currencySymbol={getCurrencySymbol()}
-                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
-                                />
-                            ))}
-                            {!searchQuery && hasNextPage && (
-                                <div
-                                    ref={ref}
-                                    className="col-span-full flex justify-center my-4"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => fetchNextPage()}
-                                        disabled={isFetchingNextPage}
-                                    >
-                                        {isFetchingNextPage ? (
-                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>
-                                        ) : (
-                                            <ChevronDown className="mr-2 h-4 w-4"/>
-                                        )}
-                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
-                                    </Button>
-                                </div>
+                        <Button
+                            className="w-full mt-2"
+                            size="sm"
+                            disabled={cart.length === 0 || !selectedCustomer || loading}
+                            onClick={handleCompleteSale}
+                            style={{ backgroundColor: theme.primary }}
+                        >
+                            {loading ? (
+                                <RefreshCcw size={16} className="mr-2 animate-spin" />
+                            ) : (
+                                <CreditCard size={16} className="mr-2" />
                             )}
-                        </>
-                    )}
-                </div>
+                            Complete Sale
+                        </Button>
+                    </div>
+                </Card>
             </div>
         </div>
     );
