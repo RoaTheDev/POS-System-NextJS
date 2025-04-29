@@ -1,16 +1,14 @@
 'use client'
 
-import {ProductType} from "@/lib/types/productType";
 import {useEffect, useState} from 'react'
 import {useRouter} from 'next/navigation'
-import {ArrowLeft, CalendarIcon, Eye, FileText, Printer, Search, User} from 'lucide-react'
-import {collection, getDocs, orderBy, query, Timestamp} from 'firebase/firestore'
+import {ArrowLeft, CalendarIcon, Eye, FileText, Search} from 'lucide-react'
+import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
 import {db} from '@/lib/firebase'
 import {theme} from '@/lib/colorPattern'
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardContent} from '@/components/ui/card'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Badge} from '@/components/ui/badge'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -18,28 +16,34 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {Calendar as CalendarComponent} from '@/components/ui/calendar'
 import {format} from 'date-fns'
 import {Customer} from "@/lib/stores/saleStore";
-import {Sale} from "@/lib/types/saleType";
+import Pagination from '@/components/common/Pagination';
+import {Skeleton} from "@/components/ui/skeleton";
+import {SaleHistory} from "@/lib/types/saleType";
+import ReceiptModal from "@/components/sales/ReceiptModal";
 
 
 export default function SalesHistoryPage() {
-    const [sales, setSales] = useState<Sale[]>([])
+
+    const [sales, setSales] = useState<SaleHistory[]>([])
     const [customers, setCustomers] = useState<Record<string, Customer>>({})
-    const [products, setProducts] = useState<Record<string, ProductType>>({})
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+    const [selectedSale, setSelectedSale] = useState<SaleHistory | null>(null)
     const [paymentFilter, setPaymentFilter] = useState<string>('all')
+    const [currencyFilter, setCurrencyFilter] = useState<string>('all')
     const [dateFilter, setDateFilter] = useState<Date | null>(null)
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
+    const [totalItems, setTotalItems] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
 
     const router = useRouter()
 
-    // Fetch sales data
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchCustomers = async () => {
             try {
-                setLoading(true)
-
-
                 const customersQuery = query(collection(db, 'customers'))
                 const customersSnapshot = await getDocs(customersQuery)
                 const customersMap: Record<string, Customer> = {}
@@ -52,37 +56,59 @@ export default function SalesHistoryPage() {
                     }
                 })
                 setCustomers(customersMap)
-                const productsQuery = query(collection(db, 'products'))
-                const productsSnapshot = await getDocs(productsQuery)
-                const productsMap: Record<string, ProductType> = {}
+            } catch (error) {
+                console.error('Error fetching customers data:', error)
+            }
+        }
 
-                productsSnapshot.docs.forEach(doc => {
-                    const productData = doc.data() as ProductType
-                    productsMap[productData.productId] = productData
-                })
-                setProducts(productsMap)
+        fetchCustomers()
+    }, [])
 
-                // Fetch sales
-                const salesQuery = query(collection(db, 'sales'), orderBy('saleDate', 'desc'))
+    useEffect(() => {
+        const fetchSales = async () => {
+            try {
+                setLoading(true)
+
+                const salesQuery = query(
+                    collection(db, 'sales'),
+                    orderBy('saleDate', 'desc'),
+                    limit(itemsPerPage)
+                )
+
+
+                const countQuery = query(collection(db, 'sales'))
+                const countSnapshot = await getDocs(countQuery)
+                const total = countSnapshot.size
+                setTotalItems(total)
+                setTotalPages(Math.ceil(total / itemsPerPage))
+
                 const salesSnapshot = await getDocs(salesQuery)
 
+                const currencies = new Set<string>()
+
                 const salesData = salesSnapshot.docs.map(doc => {
-                    const data = doc.data() as Sale;
+                    const data = doc.data() as SaleHistory;
+
+                    if (data.currency) {
+                        currencies.add(data.currency)
+                    }
+
                     return {
-                        id: doc.id, // Use Firestore document ID
+                        id: doc.id,
                         saleId: data.saleId,
                         customerId: data.customerId,
-                        products: data.products.map(product => ({
-                            ...product,
-                            productName: productsMap[product.productId]?.productName || 'Unknown ProductType'
-                        })),
+                        products: data.products,
                         totalAmount: data.totalAmount,
+                        totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
                         paymentMethod: data.paymentMethod,
+                        currency: data.currency || 'USD',
+                        exchangeRate: data.exchangeRate || 1,
                         saleDate: data.saleDate,
-                        customerName: customersMap[data.customerId]?.name || 'Unknown'
+                        customerName: customers[data.customerId]?.name || 'Unknown'
                     };
                 });
 
+                setAvailableCurrencies(Array.from(currencies))
                 setSales(salesData)
             } catch (error) {
                 console.error('Error fetching sales data:', error)
@@ -91,43 +117,125 @@ export default function SalesHistoryPage() {
             }
         }
 
-        fetchData()
-    }, [])
+        fetchSales()
+    }, [customers, dateFilter, itemsPerPage, currentPage])
 
-    // Filter sales based on search query, payment method, and date
+    const handlePageChange = async (page: number) => {
+        try {
+            setLoading(true)
+            setCurrentPage(page)
+
+            const skipItems = (page - 1) * itemsPerPage
+
+            let salesQuery;
+
+            if (page === 1) {
+                salesQuery = query(
+                    collection(db, 'sales'),
+                    orderBy('saleDate', 'desc'),
+                    limit(itemsPerPage)
+                )
+            } else {
+                const previousPageQuery = query(
+                    collection(db, 'sales'),
+                    orderBy('saleDate', 'desc'),
+                    limit(skipItems)
+                )
+                const previousPageSnapshot = await getDocs(previousPageQuery)
+                const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1]
+
+                salesQuery = query(
+                    collection(db, 'sales'),
+                    orderBy('saleDate', 'desc'),
+                    startAfter(lastVisible),
+                    limit(itemsPerPage)
+                )
+            }
+
+            if (dateFilter) {
+                const startOfDay = new Date(dateFilter)
+                startOfDay.setHours(0, 0, 0, 0)
+
+                const endOfDay = new Date(dateFilter)
+                endOfDay.setHours(23, 59, 59, 999)
+
+                salesQuery = query(
+                    collection(db, 'sales'),
+                    where('saleDate', '>=', Timestamp.fromDate(startOfDay)),
+                    where('saleDate', '<=', Timestamp.fromDate(endOfDay)),
+                    orderBy('saleDate', 'desc'),
+                    limit(itemsPerPage)
+                )
+            }
+
+            const salesSnapshot = await getDocs(salesQuery)
+
+            const salesData = salesSnapshot.docs.map(doc => {
+                const data = doc.data() as SaleHistory;
+
+                return {
+                    id: doc.id,
+                    saleId: data.saleId,
+                    customerId: data.customerId,
+                    products: data.products,
+                    totalAmount: data.totalAmount,
+                    totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
+                    paymentMethod: data.paymentMethod,
+                    currency: data.currency || 'USD',
+                    exchangeRate: data.exchangeRate || 1,
+                    saleDate: data.saleDate,
+                    customerName: customers[data.customerId]?.name || 'Unknown'
+                };
+            });
+
+            setSales(salesData)
+        } catch (error) {
+            console.error('Error changing page:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleItemsPerPageChange = (value: string) => {
+        const newItemsPerPage = parseInt(value)
+        setItemsPerPage(newItemsPerPage)
+        setCurrentPage(1)
+        setTotalPages(Math.ceil(totalItems / newItemsPerPage))
+    }
+
     const filteredSales = sales.filter(sale => {
-        // Search filter
         const searchLower = searchQuery.toLowerCase()
         const matchesSearch = sale.saleId.toLowerCase().includes(searchLower) ||
             sale.customerName?.toLowerCase().includes(searchLower) ||
             sale.products.some(p => p.productName?.toLowerCase().includes(searchLower))
 
-        // Payment method filter
         const matchesPayment = paymentFilter === 'all' || sale.paymentMethod === paymentFilter
 
-        // Date filter
+        const matchesCurrency = currencyFilter === 'all' || sale.currency === currencyFilter
+
         const matchesDate = !dateFilter ||
             (dateFilter && format(sale.saleDate.toDate(), 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd'))
 
-        return matchesSearch && matchesPayment && matchesDate
+        return matchesSearch && matchesPayment && matchesCurrency && matchesDate
     })
 
-    // Format date
     const formatDate = (timestamp: Timestamp) => {
         return format(timestamp.toDate(), 'MMM dd, yyyy • h:mm a')
     }
 
-    // Format payment method
     const formatPaymentMethod = (method: string) => {
         return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')
     }
 
-    // View sale details
-    const handleViewSale = (sale: Sale) => {
-        setSelectedSale(sale)
-    }
+    const handleViewSale = (sale: SaleHistory) => {
+        setSelectedSale(sale);
+        setIsReceiptModalOpen(true);
+    };
+    const handleCloseReceiptModal = () => {
+        setIsReceiptModalOpen(false);
+        setSelectedSale(null);
+    };
 
-    // Get payment method badge color
     const getPaymentBadgeStyle = (method: string) => {
         switch (method) {
             case 'cash':
@@ -141,9 +249,39 @@ export default function SalesHistoryPage() {
         }
     }
 
-    // Handle calendar date selection
+    const getCurrencyBadgeStyle = (currency: string) => {
+        switch (currency) {
+            case 'USD':
+                return {backgroundColor: '#4CAF50', color: 'white'}
+            case 'EUR':
+                return {backgroundColor: '#2196F3', color: 'white'}
+            case 'GBP':
+                return {backgroundColor: '#FF9800', color: 'white'}
+            case 'JPY':
+                return {backgroundColor: '#9C27B0', color: 'white'}
+            default:
+                return {backgroundColor: '#607D8B', color: 'white'}
+        }
+    }
+
     const handleDateSelect = (day: Date | undefined) => {
         setDateFilter(day || null)
+        setCurrentPage(1)
+    }
+
+    const renderSkeletons = () => {
+        return Array.from({length: itemsPerPage}).map((_, index) => (
+            <TableRow key={`skeleton-${index}`}>
+                <TableCell><Skeleton className="h-5 w-20"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-32"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-24"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-16"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-20"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-24"/></TableCell>
+                <TableCell><Skeleton className="h-5 w-16"/></TableCell>
+                <TableCell><Skeleton className="h-8 w-8 rounded-full"/></TableCell>
+            </TableRow>
+        ))
     }
 
     return (
@@ -190,6 +328,21 @@ export default function SalesHistoryPage() {
                         </SelectContent>
                     </Select>
 
+                    <Select
+                        value={currencyFilter}
+                        onValueChange={setCurrencyFilter}
+                    >
+                        <SelectTrigger className="h-10 w-full md:w-40">
+                            <SelectValue placeholder="Currency"/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Currencies</SelectItem>
+                            {availableCurrencies.map(currency => (
+                                <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button
@@ -227,8 +380,24 @@ export default function SalesHistoryPage() {
             <Card className="flex-grow overflow-hidden">
                 <CardContent className="p-0 h-full">
                     {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <p style={{color: theme.text}}>Loading sales data...</p>
+                        <div className="overflow-x-auto h-full">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Sale ID</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Items</TableHead>
+                                        <TableHead>Total</TableHead>
+                                        <TableHead>Currency</TableHead>
+                                        <TableHead>Payment</TableHead>
+                                        <TableHead className="w-16">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {renderSkeletons()}
+                                </TableBody>
+                            </Table>
                         </div>
                     ) : filteredSales.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
@@ -237,17 +406,18 @@ export default function SalesHistoryPage() {
                                 No sales found
                             </p>
                             <p className="text-sm" style={{color: theme.text}}>
-                                {searchQuery || paymentFilter !== 'all' || dateFilter
+                                {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
                                     : 'Create your first sale to see it here'}
                             </p>
-                            {(searchQuery || paymentFilter !== 'all' || dateFilter) && (
+                            {(searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter) && (
                                 <Button
                                     variant="outline"
                                     className="mt-4"
                                     onClick={() => {
                                         setSearchQuery('')
                                         setPaymentFilter('all')
+                                        setCurrencyFilter('all')
                                         setDateFilter(null)
                                     }}
                                 >
@@ -265,6 +435,7 @@ export default function SalesHistoryPage() {
                                         <TableHead>Customer</TableHead>
                                         <TableHead>Items</TableHead>
                                         <TableHead>Total</TableHead>
+                                        <TableHead>Currency</TableHead>
                                         <TableHead>Payment</TableHead>
                                         <TableHead className="w-16">Actions</TableHead>
                                     </TableRow>
@@ -287,6 +458,13 @@ export default function SalesHistoryPage() {
                                             </TableCell>
                                             <TableCell className="font-medium" style={{color: theme.primary}}>
                                                 ${Number(sale.totalAmount).toFixed(2)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    style={getCurrencyBadgeStyle(sale.currency)}
+                                                >
+                                                    {sale.currency}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
@@ -314,142 +492,22 @@ export default function SalesHistoryPage() {
                 </CardContent>
             </Card>
 
-            {/* Sale details dialog */}
-            <Dialog open={!!selectedSale} onOpenChange={(open) => !open && setSelectedSale(null)}>
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle style={{color: theme.primary}}>
-                            Sale Details - {selectedSale?.saleId}
-                        </DialogTitle>
-                    </DialogHeader>
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChangeAction={handlePageChange}
+                onItemsPerPageChangeAction={handleItemsPerPageChange}
+                itemName="sales"
+            />
 
-                    {selectedSale && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Sale information */}
-                                <Card>
-                                    <CardHeader className="py-3">
-                                        <CardTitle className="text-base" style={{color: theme.primary}}>
-                                            Sale Information
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="py-2">
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between">
-                                                <span className="text-sm" style={{color: theme.text}}>Date:</span>
-                                                <span
-                                                    className="text-sm font-medium">{formatDate(selectedSale.saleDate)}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-sm"
-                                                      style={{color: theme.text}}>Payment Method:</span>
-                                                <Badge style={getPaymentBadgeStyle(selectedSale.paymentMethod)}>
-                                                    {formatPaymentMethod(selectedSale.paymentMethod)}
-                                                </Badge>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-sm"
-                                                      style={{color: theme.text}}>Total Amount:</span>
-                                                <span className="text-sm font-bold" style={{color: theme.primary}}>
-                                                    ${Number(selectedSale.totalAmount).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Customer information */}
-                                <Card>
-                                    <CardHeader className="py-3">
-                                        <CardTitle className="text-base" style={{color: theme.primary}}>
-                                            Customer Information
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="py-2">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <User size={16} style={{color: theme.primary}}/>
-                                                <span className="font-medium">{selectedSale.customerName}</span>
-                                            </div>
-                                            <div className="text-sm">
-                                                {customers[selectedSale.customerId]?.phone && (
-                                                    <p>Phone: {customers[selectedSale.customerId]?.phone}</p>
-                                                )}
-                                                {customers[selectedSale.customerId]?.address && (
-                                                    <p>Address: {customers[selectedSale.customerId]?.address}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            {/* Products */}
-                            <Card>
-                                <CardHeader className="py-3">
-                                    <CardTitle className="text-base" style={{color: theme.primary}}>
-                                        Products Purchased
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="py-0">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Product</TableHead>
-                                                <TableHead className="text-right">Price</TableHead>
-                                                <TableHead className="text-right">Quantity</TableHead>
-                                                <TableHead className="text-right">Subtotal</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {selectedSale.products.map((product, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell>{product.productName}</TableCell>
-                                                    <TableCell
-                                                        className="text-right">${product.price.toFixed(2)}</TableCell>
-                                                    <TableCell className="text-right">{product.quantity}</TableCell>
-                                                    <TableCell className="text-right font-medium">
-                                                        ${(product.price * product.quantity).toFixed(2)}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            <TableRow>
-                                                <TableCell colSpan={3} className="text-right font-bold">
-                                                    Total
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold"
-                                                           style={{color: theme.primary}}>
-                                                    ${Number(selectedSale.totalAmount).toFixed(2)}
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
-                                </CardContent>
-                            </Card>
-
-                            {/* Actions */}
-                            <div className="flex justify-end gap-2">
-                                <Button
-                                    variant="outline"
-                                    style={{borderColor: theme.primary, color: theme.primary}}
-                                    onClick={() => setSelectedSale(null)}
-                                >
-                                    Close
-                                </Button>
-                                <Button
-                                    style={{backgroundColor: theme.primary}}
-                                    onClick={() => {
-                                        console.log('Print receipt for sale:', selectedSale.saleId)
-                                        window.alert('Printing receipt for sale: ' + selectedSale.saleId)
-                                    }}
-                                >
-                                    <Printer size={16} className="mr-2"/> Print Receipt
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <ReceiptModal
+                open={isReceiptModalOpen}
+                onClose={handleCloseReceiptModal}
+                sale={selectedSale}
+                customers={customers}
+            />
         </div>
     )
 }

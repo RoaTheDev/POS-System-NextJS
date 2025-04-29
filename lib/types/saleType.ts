@@ -18,3 +18,20 @@ export interface Sale {
     paymentMethod: string
     saleDate: Timestamp
 }
+export interface SaleHistory {
+    id: string;
+    saleId: string;
+    customerId: string;
+    products: {
+        productName: string;
+        quantity: number;
+        price: number;
+    }[];
+    totalAmount: string;
+    totalAmountInSelectedCurrency?: string;
+    paymentMethod: string;
+    currency: string;
+    exchangeRate: number;
+    saleDate: Timestamp;
+    customerName?: string;
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import {usePathname, useRouter} from 'next/navigation'
-import {Home, Package, ShoppingCart, User2} from 'lucide-react'
+import {History, Package, ShoppingCart, User2} from 'lucide-react'
 import {theme} from '@/lib/colorPattern'
 
 export default function Navigation() {
@@ -9,14 +9,13 @@ export default function Navigation() {
     const router = useRouter()
 
     const navItems = [
-        {name: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard'},
-        {name: 'products', label: 'Products', icon: Package, path: '/products'},
         {name: 'sales', label: 'Sales', icon: ShoppingCart, path: '/sales'},
-        {name: 'customers', label: "Customers", icon: User2, path: '/customers'}
+        {name: 'products', label: 'Products', icon: Package, path: '/products'},
+        {name: 'customers', label: "Customers", icon: User2, path: '/customers'},
+        {name: 'sale-history', label: "Sale-History", icon: History, path: '/sales/history'}
     ]
 
     const activePage = navItems.find(item => pathname === item.path)?.name || 'dashboard'
-
 
 
     const Sidebar = () => (
@@ -26,7 +25,7 @@ export default function Navigation() {
         >
             <div className="p-4">
                 <h1 className="text-xl font-bold" style={{color: theme.primary}}>
-               Mai Sophany Sound
+                    Mai Sophany Sound
                 </h1>
             </div>
             <nav className="p-4">

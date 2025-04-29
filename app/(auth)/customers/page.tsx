@@ -156,11 +156,7 @@ export default function CustomerManagementPage() {
                     <Users className="inline mr-2 mb-1" size={24} />
                     Customer Management
                 </h1>
-                <Link href="/sales">
-                    <Button variant="outline" style={{ borderColor: theme.primary, color: theme.primary }}>
-                        Back to Sales
-                    </Button>
-                </Link>
+
                 <div></div>
             </div>
 
