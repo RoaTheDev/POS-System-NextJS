@@ -1,5 +1,5 @@
 import {queryClient} from './reactQuery';
-import {clearExpiredImagesFromCache} from './imageCache';
+import {clearExpiredImagesFromCache} from './cache/imageCache';
 
 const INACTIVE_CACHE_TTL = 24 * 60 * 60 * 1000;
 

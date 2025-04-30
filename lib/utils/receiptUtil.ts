@@ -9,7 +9,6 @@ export const printReceipt = (elementId: string): void => {
         return;
     }
 
-    // Create a hidden iframe for printing
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.width = '0';
@@ -24,7 +23,6 @@ export const printReceipt = (elementId: string): void => {
         return;
     }
 
-    // Include styles to match CompactReceipt
     const printStyles = `
         <style>
             @media print {
@@ -35,10 +33,10 @@ export const printReceipt = (elementId: string): void => {
                     background: white;
                 }
                 #print-container {
-                    width: 80mm; /* Standard thermal receipt width */
+                    width: 80mm;
                     margin: 0 auto;
-                    padding: 24px; /* p-6 */
-                    max-width: 448px; /* max-w-md */
+                    padding: 24px;
+                    max-width: 448px; 
                     background: white;
                     color: #000;
                     box-sizing: border-box;
@@ -59,7 +57,7 @@ export const printReceipt = (elementId: string): void => {
                     font-size: 12px;
                 }
                 .border-t, .border-b {
-                    border-top: 1px solid #e5e7eb; /* border-gray-200 */
+                    border-top: 1px solid #e5e7eb;
                     border-bottom: 1px solid #e5e7eb;
                 }
                 .py-2 {
@@ -107,7 +105,7 @@ export const printReceipt = (elementId: string): void => {
                     padding-bottom: 4px;
                 }
                 .border-b {
-                    border-bottom: 1px solid #f3f4f6; /* border-gray-100 */
+                    border-bottom: 1px solid #f3f4f6;
                 }
                 .truncate {
                     overflow: hidden;

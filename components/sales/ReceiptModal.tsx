@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {theme} from '@/lib/colorPattern';
-import {Printer, X} from 'lucide-react';
+import {Printer} from 'lucide-react';
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {SaleHistory} from '@/lib/types/saleType';
@@ -33,17 +33,14 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({open, onClose, sale, custome
     };
 
 
-
     if (!sale) return null;
 
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent className="max-w-md">
-                <DialogHeader className="flex flex-row items-center justify-between">
+                <DialogHeader onClick={onClose} className="flex flex-row items-center justify-between">
                     <DialogTitle style={{color: theme.primary}}>Receipt</DialogTitle>
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X size={18}/>
-                    </Button>
+
                 </DialogHeader>
 
                 {/* Receipt Content */}
@@ -56,7 +53,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({open, onClose, sale, custome
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-3 gap-2 mt-4">
+                <div className="mt-4 flex justify-center">
                     <Button
                         className="flex items-center justify-center gap-2"
                         style={{backgroundColor: theme.primary}}

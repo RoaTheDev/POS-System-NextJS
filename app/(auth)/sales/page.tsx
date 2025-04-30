@@ -5,9 +5,8 @@ import {useRouter} from 'next/navigation';
 import {
     CheckCircle,
     ChevronDown,
-    ChevronUp,
-    CreditCard,
-    Package,
+    CreditCard, Minus,
+    Package, Plus,
     PlusCircle,
     RefreshCcw,
     Search,
@@ -36,7 +35,7 @@ type CurrencyCode = 'USD' | 'THB' | 'KHR';
 
 const CONVERSION_RATES: Record<CurrencyCode, number> = {
     'USD': 1,      // Base currency
-    'THB': 35.2,   // 1 USD = 35.2 THB
+    'THB': 34,   // 1 USD = 35.2 THB
     'KHR': 4100    // 1 USD = 4100 KHR
 };
 
@@ -55,7 +54,8 @@ export default function SalesPage() {
     const [saleComplete, setSaleComplete] = useState(false);
     const [saleId, setSaleId] = useState('');
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
-    const [isSaleSummaryExpanded, setIsSaleSummaryExpanded] = useState(false); // New state for mobile expansion
+    const [isSaleSummaryExpanded, setIsSaleSummaryExpanded] = useState(false);
+    const [cartCount, setCartCount] = useState(0);
 
     const {data: customersData, isLoading: isLoadingCustomers} = useCustomers();
     const {data: filteredProductsData, isLoading: isLoadingFiltered} = useFilteredProducts(searchQuery);
@@ -87,6 +87,10 @@ export default function SalesPage() {
         selectedCustomer
     } = useSalesStore();
     const router = useRouter();
+
+    useEffect(() => {
+        setCartCount(cart.reduce((total, item) => total + item.quantity, 0));
+    }, [cart]);
 
     useEffect(() => {
         if (customersData && selectedCustomer) {
@@ -158,6 +162,7 @@ export default function SalesPage() {
             setLoading(false);
         }
     };
+
 
     const handleCompleteSale = async () => {
         if (cart.length === 0) {
@@ -242,7 +247,7 @@ export default function SalesPage() {
 
     if (saleComplete) {
         return (
-            <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center">
+            <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center p-4">
                 <div
                     className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
                     style={{backgroundColor: theme.secondary}}
@@ -279,7 +284,6 @@ export default function SalesPage() {
 
     return (
         <div className="flex flex-col lg:flex-row h-full gap-6 pb-20 lg:pb-0">
-            {/* Sale Management */}
             <div className="flex-1 flex flex-col order-1">
                 <div className="mb-4">
                     <div className="flex justify-between mb-2.5">
@@ -287,6 +291,22 @@ export default function SalesPage() {
                             <ShoppingCart className="inline mr-2 mb-1" size={24}/>
                             Sale Management
                         </h1>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="lg:hidden relative"
+                            onClick={() => setIsSaleSummaryExpanded(!isSaleSummaryExpanded)}
+                            style={{borderColor: theme.primary, color: theme.primary}}
+                        >
+                            <ShoppingCart size={20}/>
+                            {cartCount > 0 && (
+                                <span
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                    {cartCount}
+                                </span>
+                            )}
+                        </Button>
                     </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
@@ -299,8 +319,8 @@ export default function SalesPage() {
                     </div>
                 </div>
                 <div
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto flex-grow pb-4"
-                >
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 sm:gap-4 overflow-y-auto pb-4">
+
                     {isLoadingProducts || isLoadingFiltered ? (
                         <div className="col-span-full flex items-center justify-center h-40">
                             <p style={{color: theme.text}}>Loading products...</p>
@@ -349,23 +369,29 @@ export default function SalesPage() {
                 </div>
             </div>
 
-            {/* Sale Summary */}
-            <div
-                className="w-full lg:w-96 flex flex-col order-2 lg:order-2 fixed bottom-16 lg:static lg:bottom-auto z-20 lg:z-auto bg-white lg:bg-transparent shadow-lg lg:shadow-none">
-                <Card className="flex-grow">
-                    <CardHeader className="flex flex-row items-center justify-between lg:block">
+            <div className={`
+                lg:w-96 lg:flex lg:flex-col lg:order-2 lg:static
+                fixed inset-0 z-30 transform transition-transform duration-300 ease-in-out
+                ${isSaleSummaryExpanded ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
+                lg:transform-none lg:z-auto lg:duration-0
+                bg-white lg:bg-transparent
+                overflow-auto
+            `}>
+                <Card
+                    className="h-full flex flex-col border-0 lg:border rounded-none lg:rounded-lg shadow-none lg:shadow">
+                    <CardHeader
+                        className="sticky top-0 z-10 bg-white border-b lg:border-none flex flex-row items-center justify-between">
                         <CardTitle style={{color: theme.primary}}>Sale Summary</CardTitle>
                         <Button
                             variant="ghost"
                             size="icon"
                             className="lg:hidden"
-                            onClick={() => setIsSaleSummaryExpanded(!isSaleSummaryExpanded)}
+                            onClick={() => setIsSaleSummaryExpanded(false)}
                         >
-                            {isSaleSummaryExpanded ? <ChevronDown size={20}/> : <ChevronUp size={20}/>}
+                            <X size={20}/>
                         </Button>
                     </CardHeader>
-                    <CardContent
-                        className={`flex flex-col h-full ${isSaleSummaryExpanded ? 'block' : 'hidden lg:block'}`}>
+                    <CardContent className="flex-grow overflow-y-auto pb-safe">
                         <div className="mb-4">
                             <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
                                 Customer
@@ -378,13 +404,13 @@ export default function SalesPage() {
                                                 variant="outline"
                                                 role="combobox"
                                                 aria-expanded={customerPopoverOpen}
-                                                className="w-72 justify-between"
+                                                className="flex-1 justify-between"
                                             >
                                                 {selectedCustomer ? selectedCustomer.name : "Select customer..."}
                                                 <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
                                             </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-full p-0" align="start">
+                                        <PopoverContent className="w-72 p-0" align="start">
                                             <Command>
                                                 <CommandInput
                                                     placeholder="Search customer..."
@@ -495,7 +521,6 @@ export default function SalesPage() {
                             )}
                         </div>
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-                        {/* Payment method and Currency */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
                                 <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
@@ -511,6 +536,7 @@ export default function SalesPage() {
                                     <SelectContent>
                                         <SelectItem value="cash">Cash</SelectItem>
                                         <SelectItem value="card">Card</SelectItem>
+                                        <SelectItem value="bank_transfer">ABA</SelectItem>
                                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -535,7 +561,6 @@ export default function SalesPage() {
                             </div>
                         </div>
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-                        {/* Cart items */}
                         <div className="flex-grow overflow-y-auto mb-4">
                             <label className="text-sm font-medium mb-2 block" style={{color: theme.text}}>
                                 Cart Items
@@ -556,24 +581,42 @@ export default function SalesPage() {
                                                 className="flex items-center justify-between p-2 rounded-md"
                                                 style={{backgroundColor: theme.light}}
                                             >
-                                                <div className="flex-1">
-                                                    <p className="font-medium" style={{color: theme.text}}>
-                                                        {item.productName}
+                                                <div className="flex items-center space-x-2">
+                                                    <p className="text-sm" style={{ color: theme.text }}>
+                                                        {getCurrencySymbol()}{priceInSelectedCurrency.toFixed(2)} ×
                                                     </p>
                                                     <div className="flex items-center">
-                                                        <p className="text-sm" style={{color: theme.text}}>
-                                                            {getCurrencySymbol()}{priceInSelectedCurrency.toFixed(2)} ×
-                                                        </p>
+                                                        <Button
+                                                            size="icon"
+                                                            className="ml-2.5 h-7 w-6 rounded-l-md border-r p-0 bg-red-400 hover:bg-red-500"
+                                                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                                            disabled={item.quantity <= 1 || item.stock === 0}
+                                                        >
+                                                            <Minus size={12} />
+                                                        </Button>
                                                         <Input
                                                             type="number"
                                                             min="1"
                                                             max={item.stock}
                                                             value={item.quantity}
-                                                            onChange={(e) => updateQuantity(item.productId, Number(e.target.value))}
-                                                            className="w-16 h-6 ml-1 text-sm"
+                                                            onChange={(e) => {
+                                                                const val = Math.max(1, Math.min(Number(e.target.value || 1), item.stock));
+                                                                updateQuantity(item.productId, val);
+                                                            }}
+                                                            className="mx-2 w-7 text-center border-0 focus-visible:ring-0 no-spinner p-0 text-sm h-7"
+                                                            disabled={item.stock === 0}
                                                         />
+                                                        <Button
+                                                            size="icon"
+                                                            className="h-7 w-6 rounded-r-md border-l p-0 bg-blue-300 hover:bg-blue-500"
+                                                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                            disabled={item.quantity >= item.stock || item.stock === 0}
+                                                        >
+                                                            <Plus size={12} />
+                                                        </Button>
                                                     </div>
                                                 </div>
+
                                                 <div className="text-right">
                                                     <p className="font-medium" style={{color: theme.primary}}>
                                                         {getCurrencySymbol()}{itemTotalInSelectedCurrency.toFixed(2)}
@@ -594,20 +637,17 @@ export default function SalesPage() {
                             )}
                         </div>
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
-                        {/* Exchange rate info */}
                         {currency !== 'USD' && (
                             <div className="mb-4 text-sm" style={{color: theme.text}}>
                                 <p>Exchange Rate: 1 USD = {CONVERSION_RATES[currency]} {currency}</p>
                             </div>
                         )}
-                        {/* Total */}
                         <div className="flex justify-between items-center mb-4">
                             <p className="font-medium" style={{color: theme.text}}>Total</p>
                             <p className="text-xl font-bold" style={{color: theme.primary}}>
                                 {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)} {currency}
                             </p>
                         </div>
-                        {/* Complete sale button */}
                         <Button
                             className="w-full"
                             size="lg"
@@ -626,38 +666,26 @@ export default function SalesPage() {
                             )}
                         </Button>
                     </CardContent>
-                    {/* Compact Sale Summary for Mobile */}
-                    <div className={`lg:hidden p-4 border-t ${isSaleSummaryExpanded ? 'hidden' : 'block'}`}
-                         style={{borderColor: theme.secondary, backgroundColor: theme.light}}>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium" style={{color: theme.text}}>
-                                    {selectedCustomer ? selectedCustomer.name : 'Select customer'}
-                                </p>
-                                <p className="text-sm" style={{color: theme.text}}>
-                                    ({cart.length} items)
-                                </p>
-                            </div>
-                            <p className="text-lg font-bold" style={{color: theme.primary}}>
-                                {getCurrencySymbol()}{getTotalInCurrency().toFixed(2)}
-                            </p>
-                        </div>
-                        <Button
-                            className="w-full mt-2"
-                            size="sm"
-                            disabled={cart.length === 0 || !selectedCustomer || loading}
-                            onClick={handleCompleteSale}
-                            style={{backgroundColor: theme.primary}}
-                        >
-                            {loading ? (
-                                <RefreshCcw size={16} className="mr-2 animate-spin"/>
-                            ) : (
-                                <CreditCard size={16} className="mr-2"/>
-                            )}
-                            Complete Sale
-                        </Button>
-                    </div>
                 </Card>
+            </div>
+
+            <div className="fixed bottom-4 right-4 z-20 lg:hidden">
+                <Button
+                    size="lg"
+                    className="rounded-full shadow-lg"
+                    style={{backgroundColor: theme.primary}}
+                    onClick={() => setIsSaleSummaryExpanded(true)}
+                >
+                    <div className="relative">
+                        <ShoppingCart size={24}/>
+                        {cartCount > 0 && (
+                            <span
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                {cartCount}
+                            </span>
+                        )}
+                    </div>
+                </Button>
             </div>
         </div>
     );

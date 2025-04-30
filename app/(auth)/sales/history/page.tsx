@@ -1,8 +1,7 @@
 'use client'
 
 import {useEffect, useState} from 'react'
-import {useRouter} from 'next/navigation'
-import {ArrowLeft, CalendarIcon, Eye, FileText, Search} from 'lucide-react'
+import {CalendarIcon, Eye, FileText, Filter, Search, X} from 'lucide-react'
 import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
 import {db} from '@/lib/firebase'
 import {theme} from '@/lib/colorPattern'
@@ -20,10 +19,16 @@ import Pagination from '@/components/common/Pagination';
 import {Skeleton} from "@/components/ui/skeleton";
 import {SaleHistory} from "@/lib/types/saleType";
 import ReceiptModal from "@/components/sales/ReceiptModal";
-
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger
+} from "@/components/ui/sheet";
 
 export default function SalesHistoryPage() {
-
     const [sales, setSales] = useState<SaleHistory[]>([])
     const [customers, setCustomers] = useState<Record<string, Customer>>({})
     const [loading, setLoading] = useState(true)
@@ -32,14 +37,15 @@ export default function SalesHistoryPage() {
     const [paymentFilter, setPaymentFilter] = useState<string>('all')
     const [currencyFilter, setCurrencyFilter] = useState<string>('all')
     const [dateFilter, setDateFilter] = useState<Date | null>(null)
-    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(10)
     const [totalItems, setTotalItems] = useState(0)
     const [totalPages, setTotalPages] = useState(1)
     const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
+    const [activeFilters, setActiveFilters] = useState(0)
 
-    const router = useRouter()
 
     useEffect(() => {
         const fetchCustomers = async () => {
@@ -74,7 +80,6 @@ export default function SalesHistoryPage() {
                     orderBy('saleDate', 'desc'),
                     limit(itemsPerPage)
                 )
-
 
                 const countQuery = query(collection(db, 'sales'))
                 const countSnapshot = await getDocs(countQuery)
@@ -119,6 +124,14 @@ export default function SalesHistoryPage() {
 
         fetchSales()
     }, [customers, dateFilter, itemsPerPage, currentPage])
+
+    useEffect(() => {
+        let count = 0
+        if (paymentFilter !== 'all') count++
+        if (currencyFilter !== 'all') count++
+        if (dateFilter !== null) count++
+        setActiveFilters(count)
+    }, [paymentFilter, currencyFilter, dateFilter])
 
     const handlePageChange = async (page: number) => {
         try {
@@ -219,9 +232,6 @@ export default function SalesHistoryPage() {
         return matchesSearch && matchesPayment && matchesCurrency && matchesDate
     })
 
-    const formatDate = (timestamp: Timestamp) => {
-        return format(timestamp.toDate(), 'MMM dd, yyyy • h:mm a')
-    }
 
     const formatPaymentMethod = (method: string) => {
         return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')
@@ -231,10 +241,19 @@ export default function SalesHistoryPage() {
         setSelectedSale(sale);
         setIsReceiptModalOpen(true);
     };
+
     const handleCloseReceiptModal = () => {
         setIsReceiptModalOpen(false);
         setSelectedSale(null);
     };
+
+    const clearAllFilters = () => {
+        setSearchQuery('')
+        setPaymentFilter('all')
+        setCurrencyFilter('all')
+        setDateFilter(null)
+        setFilterSheetOpen(false)
+    }
 
     const getPaymentBadgeStyle = (method: string) => {
         switch (method) {
@@ -253,11 +272,9 @@ export default function SalesHistoryPage() {
         switch (currency) {
             case 'USD':
                 return {backgroundColor: '#4CAF50', color: 'white'}
-            case 'EUR':
-                return {backgroundColor: '#2196F3', color: 'white'}
-            case 'GBP':
+            case 'THB':
                 return {backgroundColor: '#FF9800', color: 'white'}
-            case 'JPY':
+            case 'KHR':
                 return {backgroundColor: '#9C27B0', color: 'white'}
             default:
                 return {backgroundColor: '#607D8B', color: 'white'}
@@ -273,36 +290,65 @@ export default function SalesHistoryPage() {
         return Array.from({length: itemsPerPage}).map((_, index) => (
             <TableRow key={`skeleton-${index}`}>
                 <TableCell><Skeleton className="h-5 w-20"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-32"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-24"/></TableCell>
+                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-32"/></TableCell>
+                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24"/></TableCell>
                 <TableCell><Skeleton className="h-5 w-16"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-20"/></TableCell>
+                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-20"/></TableCell>
                 <TableCell><Skeleton className="h-5 w-24"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-16"/></TableCell>
                 <TableCell><Skeleton className="h-8 w-8 rounded-full"/></TableCell>
             </TableRow>
         ))
     }
 
+    // For mobile card view
+    const renderMobileCard = (sale: SaleHistory) => (
+        <div key={sale.saleId} className="p-4 border-b last:border-b-0">
+            <div className="flex justify-between items-start mb-2">
+                <span className="font-medium">{sale.saleId}</span>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleViewSale(sale)}
+                    style={{color: theme.primary}}
+                >
+                    <Eye size={16}/>
+                </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-y-2 text-sm">
+                <span className="text-gray-500">Customer:</span>
+                <span>{sale.customerName}</span>
+
+                <span className="text-gray-500">Items:</span>
+                <span>{sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}</span>
+
+                <span className="text-gray-500">Total:</span>
+                <span className="font-medium" style={{color: theme.primary}}>${Number(sale.totalAmount).toFixed(2)}</span>
+
+                <span className="text-gray-500">Payment:</span>
+                <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
+                    {formatPaymentMethod(sale.paymentMethod)}
+                </Badge>
+
+                <span className="text-gray-500">Currency:</span>
+                <Badge style={getCurrencyBadgeStyle(sale.currency)}>
+                    {sale.currency}
+                </Badge>
+            </div>
+        </div>
+    )
+
     return (
         <div className="flex flex-col h-full">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6">
                 <div className="flex items-center mb-4 md:mb-0">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => router.push('/sales')}
-                        className="mr-2"
-                        style={{color: theme.primary}}
-                    >
-                        <ArrowLeft size={20}/>
-                    </Button>
-                    <h1 className="text-2xl font-bold" style={{color: theme.primary}}>
+                    <h1 className="text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
                         Sales History
                     </h1>
                 </div>
 
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                {/* Search and Filter Controls - Desktop */}
+                <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="relative flex-grow md:flex-grow-0">
                         <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
                         <Input
@@ -324,6 +370,7 @@ export default function SalesHistoryPage() {
                             <SelectItem value="all">All Payments</SelectItem>
                             <SelectItem value="cash">Cash</SelectItem>
                             <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="bank_transfer">ABA</SelectItem>
                             <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                         </SelectContent>
                     </Select>
@@ -337,9 +384,10 @@ export default function SalesHistoryPage() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Currencies</SelectItem>
-                            {availableCurrencies.map(currency => (
-                                <SelectItem key={currency} value={currency}>{currency}</SelectItem>
-                            ))}
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="THB">Thai Baht (฿)</SelectItem>
+                            <SelectItem value="KHR">Khmer Riel (៛)</SelectItem>
+
                         </SelectContent>
                     </Select>
 
@@ -375,21 +423,177 @@ export default function SalesHistoryPage() {
                         </PopoverContent>
                     </Popover>
                 </div>
+
+                <div className="flex gap-2 w-full md:hidden">
+                    <div className="relative flex-grow">
+                        <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
+                        <Input
+                            placeholder="Search sales..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 h-10 w-full"
+                        />
+                    </div>
+
+                    <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+                        <SheetTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="relative"
+                                style={activeFilters > 0 ? {borderColor: theme.primary} : {}}
+                            >
+                                <Filter size={18} />
+                                {activeFilters > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                                        {activeFilters}
+                                    </span>
+                                )}
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+                            <SheetHeader className="mb-4">
+                                <SheetTitle>Filter Sales</SheetTitle>
+                                <SheetDescription>Apply filters to refine your sales history</SheetDescription>
+                            </SheetHeader>
+
+                            <div className="flex flex-col gap-4 pb-20">
+                                <div>
+                                    <label className="text-sm font-medium mb-1 block">Payment Method</label>
+                                    <Select
+                                        value={paymentFilter}
+                                        onValueChange={(value) => {
+                                            setPaymentFilter(value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Payment method"/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Payments</SelectItem>
+                                            <SelectItem value="cash">Cash</SelectItem>
+                                            <SelectItem value="card">Card</SelectItem>
+                                            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium mb-1 block">Currency</label>
+                                    <Select
+                                        value={currencyFilter}
+                                        onValueChange={(value) => {
+                                            setCurrencyFilter(value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Currency"/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Currencies</SelectItem>
+                                            {availableCurrencies.map(currency => (
+                                                <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium mb-1 block">Date</label>
+                                    <div className="border rounded-md p-3">
+                                        <CalendarComponent
+                                            mode="single"
+                                            selected={dateFilter ?? undefined}
+                                            onSelect={handleDateSelect}
+                                            className="mx-auto"
+                                        />
+                                    </div>
+                                    {dateFilter && (
+                                        <div className="flex justify-end mt-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setDateFilter(null)}
+                                                className="text-xs"
+                                            >
+                                                <X size={14} className="mr-1" /> Clear date
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2 mt-4 fixed bottom-6 left-4 right-4 bg-white pb-2 pt-2">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={clearAllFilters}
+                                    >
+                                        Clear All
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        style={{backgroundColor: theme.primary}}
+                                        onClick={() => setFilterSheetOpen(false)}
+                                    >
+                                        Apply Filters
+                                    </Button>
+                                </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                </div>
             </div>
 
-            <Card className="flex-grow overflow-hidden">
+            {/* Active filters display (mobile) */}
+            {activeFilters > 0 && (
+                <div className="md:hidden flex flex-wrap gap-2 mb-4">
+                    {paymentFilter !== 'all' && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                            {formatPaymentMethod(paymentFilter)}
+                            <X
+                                size={14}
+                                className="ml-1 cursor-pointer"
+                                onClick={() => setPaymentFilter('all')}
+                            />
+                        </Badge>
+                    )}
+                    {currencyFilter !== 'all' && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                            {currencyFilter}
+                            <X
+                                size={14}
+                                className="ml-1 cursor-pointer"
+                                onClick={() => setCurrencyFilter('all')}
+                            />
+                        </Badge>
+                    )}
+                    {dateFilter && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                            {format(dateFilter, 'MMM dd, yyyy')}
+                            <X
+                                size={14}
+                                className="ml-1 cursor-pointer"
+                                onClick={() => setDateFilter(null)}
+                            />
+                        </Badge>
+                    )}
+                </div>
+            )}
+
+            <Card className="flex-grow">
                 <CardContent className="p-0 h-full">
                     {loading ? (
                         <div className="overflow-x-auto h-full">
-                            <Table>
+                            <Table className="min-w-[640px] md:w-full">
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Sale ID</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead>Items</TableHead>
+                                        <TableHead className="hidden md:table-cell">Customer</TableHead>
+                                        <TableHead className="hidden md:table-cell">Items</TableHead>
                                         <TableHead>Total</TableHead>
-                                        <TableHead>Currency</TableHead>
+                                        <TableHead className="hidden md:table-cell">Paid In</TableHead>
                                         <TableHead>Payment</TableHead>
                                         <TableHead className="w-16">Actions</TableHead>
                                     </TableRow>
@@ -401,97 +605,78 @@ export default function SalesHistoryPage() {
                         </div>
                     ) : filteredSales.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
-                            <FileText size={48} className="mb-4 opacity-30"/>
-                            <p className="text-lg font-medium" style={{color: theme.text}}>
+                            <FileText size={48} className="mb-4 opacity-30" />
+                            <p className="text-lg font-medium" style={{ color: theme.text }}>
                                 No sales found
                             </p>
-                            <p className="text-sm" style={{color: theme.text}}>
+                            <p className="text-sm text-center px-4" style={{ color: theme.text }}>
                                 {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
                                     : 'Create your first sale to see it here'}
                             </p>
                             {(searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter) && (
-                                <Button
-                                    variant="outline"
-                                    className="mt-4"
-                                    onClick={() => {
-                                        setSearchQuery('')
-                                        setPaymentFilter('all')
-                                        setCurrencyFilter('all')
-                                        setDateFilter(null)
-                                    }}
-                                >
+                                <Button variant="outline" className="mt-4" onClick={clearAllFilters}>
                                     Clear all filters
                                 </Button>
                             )}
                         </div>
                     ) : (
-                        <div className="overflow-x-auto h-full">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Sale ID</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead>Items</TableHead>
-                                        <TableHead>Total</TableHead>
-                                        <TableHead>Currency</TableHead>
-                                        <TableHead>Payment</TableHead>
-                                        <TableHead className="w-16">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-
-                                <TableBody>
-                                    {filteredSales.map(sale => (
-                                        <TableRow key={sale.saleId}>
-                                            <TableCell className="font-medium">
-                                                {sale.saleId}
-                                            </TableCell>
-                                            <TableCell>
-                                                {formatDate(sale.saleDate)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {sale.customerName}
-                                            </TableCell>
-                                            <TableCell>
-                                                {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
-                                            </TableCell>
-                                            <TableCell className="font-medium" style={{color: theme.primary}}>
-                                                ${Number(sale.totalAmount).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    style={getCurrencyBadgeStyle(sale.currency)}
-                                                >
-                                                    {sale.currency}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    style={getPaymentBadgeStyle(sale.paymentMethod)}
-                                                >
-                                                    {formatPaymentMethod(sale.paymentMethod)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleViewSale(sale)}
-                                                    style={{color: theme.primary}}
-                                                >
-                                                    <Eye size={16}/>
-                                                </Button>
-                                            </TableCell>
+                        <>
+                            <div className="hidden md:block overflow-x-auto h-full">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Sale ID</TableHead>
+                                            <TableHead>Customer</TableHead>
+                                            <TableHead>Items</TableHead>
+                                            <TableHead>Total</TableHead>
+                                            <TableHead>Paid In</TableHead>
+                                            <TableHead>Payment</TableHead>
+                                            <TableHead className="w-16">Actions</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredSales.map(sale => (
+                                            <TableRow key={sale.saleId}>
+                                                <TableCell className="font-medium">{sale.saleId}</TableCell>
+                                                <TableCell>{sale.customerName}</TableCell>
+                                                <TableCell>
+                                                    {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
+                                                </TableCell>
+                                                <TableCell className="font-medium" style={{ color: theme.primary }}>
+                                                    ${Number(sale.totalAmount).toFixed(2)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
+                                                        {formatPaymentMethod(sale.paymentMethod)}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleViewSale(sale)}
+                                                        style={{ color: theme.primary }}
+                                                    >
+                                                        <Eye size={16} />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="md:hidden max-h-[calc(100vh-300px)] overflow-y-auto">
+                                {filteredSales.map(sale => renderMobileCard(sale))}
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
-
             <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

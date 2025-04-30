@@ -31,7 +31,7 @@ import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
 import Image from 'next/image';
 import Pagination from '@/components/common/Pagination';
 
-const categories = ['All', 'Beverages', 'Food', 'Pastries', 'Dessert', 'Merchandise'];
+const categories = ['All', 'Bass', 'Sub Woofer', 'Electronic wire', 'Microphone', 'Mixer'];
 
 export default function ProductsPage() {
     const {

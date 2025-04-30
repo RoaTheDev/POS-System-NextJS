@@ -120,3 +120,26 @@
     @apply bg-background text-foreground;
   }
 }
+input[type="number"].no-spinner::-webkit-inner-spin-button,
+input[type="number"].no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"].no-spinner {
+  -moz-appearance: textfield;
+}
+
+.product-image-container {
+  height: 18rem;
+}
+@media (min-width: 768px) {
+  .product-image-container {
+    height: 24rem;
+  }
+}
+@media (min-width: 1024px) {
+  .product-image-container {
+    height: 28rem;
+  }
+}

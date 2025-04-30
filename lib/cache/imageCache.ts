@@ -111,12 +111,10 @@ export const cloudinaryImageLoader = ({ src, width }: { src: string; width: numb
         const uploadIndex = urlParts.findIndex(part => part === 'upload');
 
         if (uploadIndex !== -1) {
-            // Insert transformation params after 'upload'
             urlParts.splice(uploadIndex + 1, 0, `c_fill,w_${width},q_auto,f_auto`);
             return urlParts.join('/');
         }
     }
 
-    // Return original URL if not Cloudinary or if parsing fails
     return src;
 };
