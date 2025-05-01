@@ -5,8 +5,10 @@ import {useRouter} from 'next/navigation';
 import {
     CheckCircle,
     ChevronDown,
-    CreditCard, Minus,
-    Package, Plus,
+    CreditCard,
+    Minus,
+    Package,
+    Plus,
     PlusCircle,
     RefreshCcw,
     Search,
@@ -30,13 +32,12 @@ import {useInView} from 'react-intersection-observer';
 import {useCustomers, useFilteredProducts, useProducts} from '@/lib/queries/saleQueries';
 import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {CurrencyCode, useExchangeRates} from '@/lib/hooks/useExchangeRate';
 
-type CurrencyCode = 'USD' | 'THB' | 'KHR';
-
-const CONVERSION_RATES: Record<CurrencyCode, number> = {
-    'USD': 1,      // Base currency
-    'THB': 34,   // 1 USD = 35.2 THB
-    'KHR': 4100    // 1 USD = 4100 KHR
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
+    'USD': '$',
+    'THB': '฿',
+    'KHR': '៛'
 };
 
 export default function SalesPage() {
@@ -56,6 +57,8 @@ export default function SalesPage() {
     const [customerPopoverOpen, setCustomerPopoverOpen] = useState(false);
     const [isSaleSummaryExpanded, setIsSaleSummaryExpanded] = useState(false);
     const [cartCount, setCartCount] = useState(0);
+
+    const {rates, loading: loadingRates, convertCurrency} = useExchangeRates(currency);
 
     const {data: customersData, isLoading: isLoadingCustomers} = useCustomers();
     const {data: filteredProductsData, isLoading: isLoadingFiltered} = useFilteredProducts(searchQuery);
@@ -101,12 +104,6 @@ export default function SalesPage() {
         }
     }, [customersData, selectedCustomer, setSelectedCustomer]);
 
-    const currencySymbols: Record<CurrencyCode, string> = {
-        'USD': '$',
-        'THB': '฿',
-        'KHR': '៛'
-    };
-
     const filteredCustomers = customersData?.filter(customer => {
         if (!customerSearchQuery) return true;
         const query = customerSearchQuery.toLowerCase();
@@ -116,10 +113,8 @@ export default function SalesPage() {
         );
     }) || [];
 
-    const convertCurrency = (amount: number, fromCurrency: CurrencyCode = 'USD', toCurrency: CurrencyCode = currency): number => {
-        if (fromCurrency === toCurrency) return amount;
-        const amountInUSD = fromCurrency === 'USD' ? amount : amount / CONVERSION_RATES[fromCurrency];
-        return amountInUSD * CONVERSION_RATES[toCurrency];
+    const getCurrencySymbol = (): string => {
+        return CURRENCY_SYMBOLS[currency];
     };
 
     const displayProducts = searchQuery ?
@@ -163,6 +158,12 @@ export default function SalesPage() {
         }
     };
 
+    const getTotalInCurrency = (targetCurrency: CurrencyCode = currency): number => {
+        return cart.reduce((sum, item) => {
+            const itemTotalInCurrency = convertCurrency(item.price * item.quantity, 'USD', targetCurrency);
+            return sum + itemTotalInCurrency;
+        }, 0);
+    };
 
     const handleCompleteSale = async () => {
         if (cart.length === 0) {
@@ -179,6 +180,8 @@ export default function SalesPage() {
             setLoading(true);
 
             const totalUSD = getTotal();
+            const totalInSelectedCurrency = getTotalInCurrency();
+            const currentExchangeRate = currency !== 'USD' ? rates[currency] : 1;
 
             const saleData = {
                 saleId: `SALE-${Date.now()}`,
@@ -189,10 +192,10 @@ export default function SalesPage() {
                     price: item.price,
                 })),
                 totalAmount: totalUSD.toString(),
-                totalAmountInSelectedCurrency: getTotalInCurrency().toString() + getCurrencySymbol(),
+                totalAmountInSelectedCurrency: totalInSelectedCurrency.toString() + getCurrencySymbol(),
                 paymentMethod,
                 currency,
-                exchangeRate: CONVERSION_RATES[currency],
+                exchangeRate: currentExchangeRate,
                 saleDate: Timestamp.now()
             };
 
@@ -232,17 +235,6 @@ export default function SalesPage() {
         setSaleComplete(false);
         setSaleId('');
         setIsSaleSummaryExpanded(false);
-    };
-
-    const getCurrencySymbol = (): string => {
-        return currencySymbols[currency];
-    };
-
-    const getTotalInCurrency = (targetCurrency: CurrencyCode = currency): number => {
-        return cart.reduce((sum, item) => {
-            const itemTotalInCurrency = convertCurrency(item.price * item.quantity, 'USD', targetCurrency);
-            return sum + itemTotalInCurrency;
-        }, 0);
     };
 
     if (saleComplete) {
@@ -582,7 +574,7 @@ export default function SalesPage() {
                                                 style={{backgroundColor: theme.light}}
                                             >
                                                 <div className="flex items-center space-x-2">
-                                                    <p className="text-sm" style={{ color: theme.text }}>
+                                                    <p className="text-sm" style={{color: theme.text}}>
                                                         {getCurrencySymbol()}{priceInSelectedCurrency.toFixed(2)} ×
                                                     </p>
                                                     <div className="flex items-center">
@@ -592,7 +584,7 @@ export default function SalesPage() {
                                                             onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                                                             disabled={item.quantity <= 1 || item.stock === 0}
                                                         >
-                                                            <Minus size={12} />
+                                                            <Minus size={12}/>
                                                         </Button>
                                                         <Input
                                                             type="number"
@@ -612,7 +604,7 @@ export default function SalesPage() {
                                                             onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                                                             disabled={item.quantity >= item.stock || item.stock === 0}
                                                         >
-                                                            <Plus size={12} />
+                                                            <Plus size={12}/>
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -639,7 +631,10 @@ export default function SalesPage() {
                         <Separator className="my-4" style={{backgroundColor: theme.secondary}}/>
                         {currency !== 'USD' && (
                             <div className="mb-4 text-sm" style={{color: theme.text}}>
-                                <p>Exchange Rate: 1 USD = {CONVERSION_RATES[currency]} {currency}</p>
+                                <p className="flex items-center">
+                                    <RefreshCcw size={14} className={`mr-1 ${loadingRates ? 'animate-spin' : ''}`}/>
+                                    Exchange Rate: 1 USD = {(1 / rates['USD'])?.toFixed(2) || '...'} {currency}
+                                </p>
                             </div>
                         )}
                         <div className="flex justify-between items-center mb-4">

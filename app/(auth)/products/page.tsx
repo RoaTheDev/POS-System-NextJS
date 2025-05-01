@@ -1,11 +1,11 @@
 'use client';
-import {theme} from "@/lib/colorPattern";
-import {useEffect, useState} from 'react';
-import {useProductStore} from '@/lib/stores/productStore';
-import {ProductFormData, ProductType} from '@/lib/types/productType';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from '@/components/ui/select';
+import { theme } from "@/lib/colorPattern";
+import { useEffect, useState } from 'react';
+import { useProductStore } from '@/lib/stores/productStore';
+import { ProductFormData, ProductType } from '@/lib/types/productType';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -14,7 +14,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import {Card, CardContent} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,11 +25,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {toast, Toaster} from 'sonner';
+import { toast, Toaster } from 'sonner';
 import ProductForm from '@/components/products/ProductForm';
-import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
-import Image from 'next/image';
+import { Edit, Plus, Search, Trash2 } from 'lucide-react';
 import Pagination from '@/components/common/Pagination';
+import CachedImage from '@/components/common/CacheImage';
 
 const categories = ['All', 'Bass', 'Sub Woofer', 'Electronic wire', 'Microphone', 'Mixer'];
 
@@ -102,7 +102,6 @@ export default function ProductsPage() {
             setDeleteProductId(null);
             toast.success('Product deleted successfully');
 
-            // Refresh current page or go to previous page if this was the last item
             if (products.length === 1 && currentPage > 1) {
                 setCurrentPage(currentPage - 1);
             } else {
@@ -139,7 +138,7 @@ export default function ProductsPage() {
     };
 
     return (
-        <div className='flex h-screen bg-gray-50' style={{backgroundColor: theme.background}}>
+        <div className='flex h-screen bg-gray-50' style={{ backgroundColor: theme.background }}>
             <Toaster
                 richColors
                 toastOptions={{
@@ -155,7 +154,7 @@ export default function ProductsPage() {
                 <main className='flex-1 overflow-y-auto p-4 pb-20 lg:pb-0'>
                     <div className='space-y-6'>
                         <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6'>
-                            <h1 className='text-2xl font-bold' style={{color: theme.text}}>Products</h1>
+                            <h1 className='text-2xl font-bold' style={{ color: theme.text }}>Products</h1>
 
                             <div className='flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0'>
                                 <div className='relative'>
@@ -165,20 +164,20 @@ export default function ProductsPage() {
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         className='pl-10'
-                                        style={{borderColor: theme.accent}}
+                                        style={{ borderColor: theme.accent }}
                                     />
                                     <Search
                                         className='absolute left-3 top-2.5'
                                         size={18}
-                                        style={{color: theme.primary}}
+                                        style={{ color: theme.primary }}
                                     />
                                 </div>
                                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                                     <SelectTrigger
                                         className='w-full sm:w-40'
-                                        style={{borderColor: theme.accent}}
+                                        style={{ borderColor: theme.accent }}
                                     >
-                                        <SelectValue placeholder='Category'/>
+                                        <SelectValue placeholder='Category' />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {categories.map(category => (
@@ -197,7 +196,7 @@ export default function ProductsPage() {
                                                 color: 'white',
                                             }}
                                         >
-                                            <Plus size={16} className='mr-1'/> Add Product
+                                            <Plus size={16} className='mr-1' /> Add Product
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className='sm:max-w-[600px]'>
@@ -230,15 +229,14 @@ export default function ProductsPage() {
                                                 borderColor: theme.secondary,
                                             }}
                                         >
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Image</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Name</th>
-                                            <th className='text-left py-3 px-4 hidden sm:table-cell'
-                                                style={{color: theme.text}}>
+                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Image</th>
+                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Name</th>
+                                            <th className='text-left py-3 px-4 hidden sm:table-cell' style={{ color: theme.text }}>
                                                 Category
                                             </th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Price</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Stock</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Actions</th>
+                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Price</th>
+                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Stock</th>
+                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Actions</th>
                                         </tr>
                                         </thead>
                                         <tbody>
@@ -265,47 +263,42 @@ export default function ProductsPage() {
                                                 <tr
                                                     key={product.productId}
                                                     className='border-b hover:bg-gray-50'
-                                                    style={{borderColor: theme.secondary}}
+                                                    style={{ borderColor: theme.secondary }}
                                                 >
                                                     <td className='py-3 px-4'>
                                                         <div className='w-12 h-12 rounded overflow-hidden bg-gray-100'>
-                                                            {product.productImgUrl ? (
-                                                                <Image
-                                                                    src={product.productImgUrl}
-                                                                    alt={product.productName}
-                                                                    width={50}
-                                                                    height={50}
-                                                                    className='w-full h-full object-cover'
-                                                                />
-                                                            ) : (
-                                                                <div
-                                                                    className='w-full h-full flex items-center justify-center'>
-                                                                    <Package size={20} style={{color: theme.primary}}/>
-                                                                </div>
-                                                            )}
+                                                            <CachedImage
+                                                                src={product.productImgUrl}
+                                                                alt={product.productName}
+                                                                width={50}
+                                                                height={50}
+                                                                cacheKey={`product_img_${product.productId}`}
+                                                                className='w-full h-full object-cover'
+                                                                sizes='50px'
+                                                            />
                                                         </div>
                                                     </td>
                                                     <td className='py-3 px-4'>{product.productName}</td>
                                                     <td className='py-3 px-4 hidden sm:table-cell'>
-                                                        <span
-                                                            className='px-2 py-1 rounded-full text-xs'
-                                                            style={{
-                                                                backgroundColor: theme.secondary,
-                                                                color: theme.text,
-                                                            }}
-                                                        >
-                                                            {product.categoryName}
-                                                        </span>
+                              <span
+                                  className='px-2 py-1 rounded-full text-xs'
+                                  style={{
+                                      backgroundColor: theme.secondary,
+                                      color: theme.text,
+                                  }}
+                              >
+                                {product.categoryName}
+                              </span>
                                                     </td>
                                                     <td className='py-3 px-4'>${product.price.toFixed(2)}</td>
                                                     <td className='py-3 px-4'>
-                                                        <span
-                                                            className={`px-2 py-1 rounded-full text-xs ${
-                                                                product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                                            }`}
-                                                        >
-                                                            {product.stock}
-                                                        </span>
+                              <span
+                                  className={`px-2 py-1 rounded-full text-xs ${
+                                      product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                  }`}
+                              >
+                                {product.stock}
+                              </span>
                                                     </td>
                                                     <td className='py-3 px-4'>
                                                         <div className='flex space-x-2'>
@@ -318,7 +311,7 @@ export default function ProductsPage() {
                                                                     color: theme.text,
                                                                 }}
                                                             >
-                                                                <Edit size={14}/>
+                                                                <Edit size={14} />
                                                             </Button>
                                                             <Button
                                                                 variant='outline'
@@ -329,7 +322,7 @@ export default function ProductsPage() {
                                                                     color: '#EF4444',
                                                                 }}
                                                             >
-                                                                <Trash2 size={14}/>
+                                                                <Trash2 size={14} />
                                                             </Button>
                                                         </div>
                                                     </td>
@@ -339,7 +332,6 @@ export default function ProductsPage() {
                                         </tbody>
                                     </table>
                                 </div>
-
 
                                 <Pagination
                                     currentPage={currentPage}

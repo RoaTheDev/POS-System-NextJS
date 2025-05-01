@@ -1,4 +1,5 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { theme } from "@/lib/colorPattern";
 import { ProductType } from '@/lib/types/productType';
 import {
@@ -6,20 +7,46 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription, // Import DialogDescription
+    DialogDescription,
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Eye, Package } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import Image from "next/image";
+import { cloudinaryImageLoader, getImageFromCache, saveImageToCache } from '@/lib/cache/imageCache';
 
 interface ProductDetailsProps {
     product: ProductType;
 }
 
 export default function ProductDetails({ product }: ProductDetailsProps) {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [isImageCached, setIsImageCached] = useState(false);
     const createdDate = product.createdAt?.toDate ? product.createdAt.toDate() : new Date();
+    const cacheKey = `product_img_${product.productId}`;
+
+    useEffect(() => {
+        const checkImageCache = async () => {
+            if (product.productImgUrl) {
+                const cachedImageUrl = await getImageFromCache(cacheKey);
+                if (cachedImageUrl) {
+                    setImageLoaded(true);
+                    setIsImageCached(true);
+                }
+            }
+        };
+
+        checkImageCache();
+    }, [product.productImgUrl, cacheKey]);
+
+    const handleImageLoad = async () => {
+        setImageLoaded(true);
+
+        if (product.productImgUrl && !isImageCached) {
+            await saveImageToCache(cacheKey, product.productImgUrl);
+        }
+    };
 
     return (
         <Dialog>
@@ -43,14 +70,23 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center relative">
                         {product.productImgUrl ? (
-                            <div className="rounded-md overflow-hidden w-full h-48">
+                            <div className="rounded-md overflow-hidden w-full h-48 relative">
                                 <Image
                                     src={product.productImgUrl}
                                     alt={product.productName}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                    sizes="(max-width: 640px) 100vw, 500px"
+                                    priority={false}
+                                    loader={cloudinaryImageLoader}
+                                    onLoad={handleImageLoad}
+                                    onError={() => console.error(`Failed to load image: ${product.productImgUrl}`)}
                                 />
+                                {!imageLoaded && (
+                                    <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+                                )}
                             </div>
                         ) : (
                             <div className="w-full h-48 bg-gray-100 rounded-md flex items-center justify-center">
@@ -68,8 +104,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                                 color: theme.text,
                             }}
                         >
-              {product.categoryName}
-            </span>
+                            {product.categoryName}
+                        </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

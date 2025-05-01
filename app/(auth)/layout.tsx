@@ -42,7 +42,7 @@ export default function AuthenticatedLayout({
             <Navigation/>
 
             <main
-                className="flex-1 flex flex-col overflow-hidden sm:mb-2 mb-10"
+                className="flex-1 flex flex-col overflow-hidden sm:mb-2 mb-14"
                 style={{backgroundColor: theme.background}}
             >
                 <header
@@ -98,7 +98,7 @@ export default function AuthenticatedLayout({
                 </div>
             </main>
 
-            {/* Logout Confirmation Dialog */}
+
             <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
                 <AlertDialogContent
                     className="rounded-lg border-0 shadow-lg"
