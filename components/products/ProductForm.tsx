@@ -161,7 +161,8 @@ export default function ProductForm({
                                     <FormItem>
                                         <FormLabel>Price</FormLabel>
                                         <FormControl>
-                                            <Input type="number" min={1} step={1} {...field} />
+
+                                            <Input type="number" min={1} step={1} {...field}  />
                                         </FormControl>
                                         <FormMessage/>
                                     </FormItem>

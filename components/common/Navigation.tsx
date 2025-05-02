@@ -1,7 +1,7 @@
 'use client'
 
 import {usePathname, useRouter} from 'next/navigation'
-import {History, Package, ShoppingCart, User2} from 'lucide-react'
+import {Book, BookA, Package, ShoppingCart, User2} from 'lucide-react'
 import {theme} from '@/lib/colorPattern'
 
 export default function Navigation() {
@@ -10,9 +10,10 @@ export default function Navigation() {
 
     const navItems = [
         {name: 'sales', label: 'Sales', icon: ShoppingCart, path: '/sales'},
+        {name: 'service', label: 'service', icon: BookA, path: '/serviceEntry'},
         {name: 'products', label: 'Products', icon: Package, path: '/products'},
         {name: 'customers', label: "Customers", icon: User2, path: '/customers'},
-        {name: 'sale-history', label: "Sale-History", icon: History, path: '/sales/history'}
+        {name: 'ledger', label: "Ledger", icon: Book, path: '/ledger'}
     ]
 
     const activePage = navItems.find(item => pathname === item.path)?.name || 'dashboard'

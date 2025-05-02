@@ -1,6 +1,6 @@
-import {useEffect, useState, useCallback, useRef} from 'react';
-import {getExchangeRate} from '../exchangeApi';
-import {clearExpiredExchangeRates} from '../cache/exchangeCache';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { fetchExchangeRates } from '../exchangeApi';
+import { clearExpiredExchangeRates } from '../cache/exchangeCache';
 
 export type CurrencyCode = 'USD' | 'THB' | 'KHR';
 
@@ -11,9 +11,9 @@ interface ExchangeRates {
 const SUPPORTED_CURRENCIES: CurrencyCode[] = ['USD', 'THB', 'KHR'];
 
 const FALLBACK_RATES: Record<CurrencyCode, Record<CurrencyCode, number>> = {
-    'USD': {'USD': 1, 'THB': 34, 'KHR': 4100},
-    'THB': {'USD': 0.0294, 'THB': 1, 'KHR': 120.59},
-    'KHR': {'USD': 0.00024, 'THB': 0.0083, 'KHR': 1}
+    'USD': { 'USD': 1, 'THB': 34, 'KHR': 4100 },
+    'THB': { 'USD': 0.0294, 'THB': 1, 'KHR': 120.59 },
+    'KHR': { 'USD': 0.00024, 'THB': 0.0083, 'KHR': 1 }
 };
 
 export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
@@ -42,22 +42,19 @@ export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
             if (isMounted.current) setError(null);
 
             try {
-                const newRates: ExchangeRates = {[baseCurrency]: 1};
+                const newRates: ExchangeRates = { [baseCurrency]: 1 };
+                const fetchedRates = await fetchExchangeRates(baseCurrency);
 
-                const fetchPromises = SUPPORTED_CURRENCIES
+                if (!fetchedRates) {
+                    throw new Error('No rates returned from API');
+                }
+
+                SUPPORTED_CURRENCIES
                     .filter(currency => currency !== baseCurrency)
-                    .map(async (currency) => {
-                        const rate = await getExchangeRate(baseCurrency, currency);
-                        return {currency, rate};
+                    .forEach(currency => {
+                        newRates[currency] = fetchedRates[currency] || FALLBACK_RATES[baseCurrency][currency];
                     });
 
-                const results = await Promise.all(fetchPromises);
-
-                results.forEach(({currency, rate}) => {
-                    newRates[currency] = rate;
-                });
-
-                console.log(`Exchange rates from ${baseCurrency}:`, newRates);
 
                 if (isMounted.current) {
                     setRates(newRates);
@@ -68,8 +65,7 @@ export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
                     setError(err instanceof Error ? err : new Error('Unknown error fetching rates'));
                 }
 
-                // Set fallback rates
-                const fallbackRates: ExchangeRates = {[baseCurrency]: 1};
+                const fallbackRates: ExchangeRates = { [baseCurrency]: 1 };
                 SUPPORTED_CURRENCIES
                     .filter(currency => currency !== baseCurrency)
                     .forEach(currency => {
@@ -109,13 +105,11 @@ export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
                 return amount / currentRates[fromCurrency];
             }
 
-
             if (baseCurrency !== fromCurrency && baseCurrency !== toCurrency) {
                 const amountInBaseCurrency = amount / currentRates[fromCurrency];
                 return amountInBaseCurrency * currentRates[toCurrency];
             }
 
-            // Fallback to hardcoded rates if something went wrong
             console.warn('Using fallback exchange rates for conversion');
             return amount * FALLBACK_RATES[fromCurrency][toCurrency];
         },

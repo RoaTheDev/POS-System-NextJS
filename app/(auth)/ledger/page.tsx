@@ -1,7 +1,7 @@
 'use client'
 
 import {useEffect, useState} from 'react'
-import {CalendarIcon, Eye, FileText, Filter, Search, X} from 'lucide-react'
+import {Book, CalendarIcon, Eye, FileText, Filter, Search, X} from 'lucide-react'
 import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
 import {db} from '@/lib/firebase'
 import {theme} from '@/lib/colorPattern'
@@ -19,16 +19,9 @@ import Pagination from '@/components/common/Pagination';
 import {Skeleton} from "@/components/ui/skeleton";
 import {SaleHistory} from "@/lib/types/saleType";
 import ReceiptModal from "@/components/sales/ReceiptModal";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger
-} from "@/components/ui/sheet";
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet";
 
-export default function SalesHistoryPage() {
+export default function LedgerPage() {
     const [sales, setSales] = useState<SaleHistory[]>([])
     const [customers, setCustomers] = useState<Record<string, Customer>>({})
     const [loading, setLoading] = useState(true)
@@ -45,7 +38,6 @@ export default function SalesHistoryPage() {
     const [totalPages, setTotalPages] = useState(1)
     const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
     const [activeFilters, setActiveFilters] = useState(0)
-
 
     useEffect(() => {
         const fetchCustomers = async () => {
@@ -232,7 +224,6 @@ export default function SalesHistoryPage() {
         return matchesSearch && matchesPayment && matchesCurrency && matchesDate
     })
 
-
     const formatPaymentMethod = (method: string) => {
         return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')
     }
@@ -300,7 +291,6 @@ export default function SalesHistoryPage() {
         ))
     }
 
-    // For mobile card view
     const renderMobileCard = (sale: SaleHistory) => (
         <div key={sale.saleId} className="p-4 border-b last:border-b-0">
             <div className="flex justify-between items-start mb-2">
@@ -323,7 +313,8 @@ export default function SalesHistoryPage() {
                 <span>{sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}</span>
 
                 <span className="text-gray-500">Total:</span>
-                <span className="font-medium" style={{color: theme.primary}}>${Number(sale.totalAmount).toFixed(2)}</span>
+                <span className="font-medium"
+                      style={{color: theme.primary}}>${Number(sale.totalAmount).toFixed(2)}</span>
 
                 <span className="text-gray-500">Payment:</span>
                 <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -342,12 +333,12 @@ export default function SalesHistoryPage() {
         <div className="flex flex-col h-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6">
                 <div className="flex items-center mb-4 md:mb-0">
-                    <h1 className="text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
-                        Sales History
+                    <Book style={{color: theme.primary}}/>
+                    <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
+                        Ledger
                     </h1>
                 </div>
 
-                {/* Search and Filter Controls - Desktop */}
                 <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="relative flex-grow md:flex-grow-0">
                         <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
@@ -387,7 +378,6 @@ export default function SalesHistoryPage() {
                             <SelectItem value="USD">USD ($)</SelectItem>
                             <SelectItem value="THB">Thai Baht (฿)</SelectItem>
                             <SelectItem value="KHR">Khmer Riel (៛)</SelectItem>
-
                         </SelectContent>
                     </Select>
 
@@ -443,102 +433,113 @@ export default function SalesHistoryPage() {
                                 className="relative"
                                 style={activeFilters > 0 ? {borderColor: theme.primary} : {}}
                             >
-                                <Filter size={18} />
+                                <Filter size={18}/>
                                 {activeFilters > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                                    <span
+                                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
                                         {activeFilters}
                                     </span>
                                 )}
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+                        <SheetContent side="bottom" className="h-[90vh] rounded-t-xl">
                             <SheetHeader className="mb-4">
                                 <SheetTitle>Filter Sales</SheetTitle>
                                 <SheetDescription>Apply filters to refine your sales history</SheetDescription>
                             </SheetHeader>
 
-                            <div className="flex flex-col gap-4 pb-20">
-                                <div>
-                                    <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                                    <Select
-                                        value={paymentFilter}
-                                        onValueChange={(value) => {
-                                            setPaymentFilter(value);
-                                            setCurrentPage(1);
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Payment method"/>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Payments</SelectItem>
-                                            <SelectItem value="cash">Cash</SelectItem>
-                                            <SelectItem value="card">Card</SelectItem>
-                                            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <label className="text-sm font-medium mb-1 block">Currency</label>
-                                    <Select
-                                        value={currencyFilter}
-                                        onValueChange={(value) => {
-                                            setCurrencyFilter(value);
-                                            setCurrentPage(1);
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Currency"/>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Currencies</SelectItem>
-                                            {availableCurrencies.map(currency => (
-                                                <SelectItem key={currency} value={currency}>{currency}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <label className="text-sm font-medium mb-1 block">Date</label>
-                                    <div className="border rounded-md p-3">
-                                        <CalendarComponent
-                                            mode="single"
-                                            selected={dateFilter ?? undefined}
-                                            onSelect={handleDateSelect}
-                                            className="mx-auto"
-                                        />
-                                    </div>
-                                    {dateFilter && (
-                                        <div className="flex justify-end mt-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setDateFilter(null)}
-                                                className="text-xs"
+                            <div className="flex flex-col h-full">
+                                {/* Scrollable container for filter inputs */}
+                                <div className="flex-1 overflow-y-auto pb-16">
+                                    <div className="flex flex-col gap-4">
+                                        <div>
+                                            <label className="text-sm font-medium mb-1 block">Payment Method</label>
+                                            <Select
+                                                value={paymentFilter}
+                                                onValueChange={(value) => {
+                                                    setPaymentFilter(value);
+                                                    setCurrentPage(1);
+                                                }}
                                             >
-                                                <X size={14} className="mr-1" /> Clear date
-                                            </Button>
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Payment method"/>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Payments</SelectItem>
+                                                    <SelectItem value="cash">Cash</SelectItem>
+                                                    <SelectItem value="card">Card</SelectItem>
+                                                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    )}
+
+                                        <div>
+                                            <label className="text-sm font-medium mb-1 block">Currency</label>
+                                            <Select
+                                                value={currencyFilter}
+                                                onValueChange={(value) => {
+                                                    setCurrencyFilter(value);
+                                                    setCurrentPage(1);
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Currency"/>
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Currencies</SelectItem>
+                                                    {availableCurrencies.map(currency => (
+                                                        <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium mb-1 block">Date</label>
+                                            <div className="border rounded-md p-3 flex justify-center">
+                                                <div className="w-fit max-w-[300px]">
+                                                    <CalendarComponent
+                                                        mode="single"
+                                                        selected={dateFilter ?? undefined}
+                                                        onSelect={handleDateSelect}
+                                                        className="mx-auto"
+                                                    />
+                                                </div>
+                                            </div>
+                                            {dateFilter && (
+                                                <div className="flex justify-end mt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setDateFilter(null)}
+                                                        className="text-xs"
+                                                    >
+                                                        <X size={14} className="mr-1"/> Clear date
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="flex gap-2 mt-4 fixed bottom-6 left-4 right-4 bg-white pb-2 pt-2">
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1"
-                                        onClick={clearAllFilters}
-                                    >
-                                        Clear All
-                                    </Button>
-                                    <Button
-                                        className="flex-1"
-                                        style={{backgroundColor: theme.primary}}
-                                        onClick={() => setFilterSheetOpen(false)}
-                                    >
-                                        Apply Filters
-                                    </Button>
+                                {/* Fixed buttons at the bottom */}
+                                <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t">
+                                    <div className="flex gap-2 max-w-md mx-auto">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={clearAllFilters}
+                                        >
+                                            Clear All
+                                        </Button>
+                                        <Button
+                                            className="flex-1"
+                                            style={{backgroundColor: theme.primary}}
+                                            onClick={() => setFilterSheetOpen(false)}
+                                        >
+                                            Apply Filters
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </SheetContent>
@@ -605,11 +606,11 @@ export default function SalesHistoryPage() {
                         </div>
                     ) : filteredSales.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
-                            <FileText size={48} className="mb-4 opacity-30" />
-                            <p className="text-lg font-medium" style={{ color: theme.text }}>
+                            <FileText size={48} className="mb-4 opacity-30"/>
+                            <p className="text-lg font-medium" style={{color: theme.text}}>
                                 No sales found
                             </p>
-                            <p className="text-sm text-center px-4" style={{ color: theme.text }}>
+                            <p className="text-sm text-center px-4" style={{color: theme.text}}>
                                 {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
                                     : 'Create your first sale to see it here'}
@@ -643,11 +644,12 @@ export default function SalesHistoryPage() {
                                                 <TableCell>
                                                     {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
                                                 </TableCell>
-                                                <TableCell className="font-medium" style={{ color: theme.primary }}>
+                                                <TableCell className="font-medium" style={{color: theme.primary}}>
                                                     ${Number(sale.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                    <Badge
+                                                        style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -659,9 +661,9 @@ export default function SalesHistoryPage() {
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => handleViewSale(sale)}
-                                                        style={{ color: theme.primary }}
+                                                        style={{color: theme.primary}}
                                                     >
-                                                        <Eye size={16} />
+                                                        <Eye size={16}/>
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>

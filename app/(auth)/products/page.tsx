@@ -1,11 +1,11 @@
 'use client';
-import { theme } from "@/lib/colorPattern";
-import { useEffect, useState } from 'react';
-import { useProductStore } from '@/lib/stores/productStore';
-import { ProductFormData, ProductType } from '@/lib/types/productType';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {theme} from "@/lib/colorPattern";
+import {useEffect, useState} from 'react';
+import {useProductStore} from '@/lib/stores/productStore';
+import {ProductFormData, ProductType} from '@/lib/types/productType';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -14,7 +14,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Card, CardContent } from '@/components/ui/card';
+import {Card, CardContent} from '@/components/ui/card';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,13 +25,23 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { toast, Toaster } from 'sonner';
+import {toast, Toaster} from 'sonner';
 import ProductForm from '@/components/products/ProductForm';
-import { Edit, Plus, Search, Trash2 } from 'lucide-react';
+import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
 import Pagination from '@/components/common/Pagination';
 import CachedImage from '@/components/common/CacheImage';
 
-const categories = ['All', 'Bass', 'Sub Woofer', 'Electronic wire', 'Microphone', 'Mixer'];
+const categories = ['All',
+    'Speaker accessories',
+    'Amplifier accessories',
+    'Connector',
+    'Amplifier',
+    'Subwoofer/solo',
+    'Speaker',
+    'Mixer/power',
+    'Driver unit',
+    'Microphone',
+    'Repair'];
 
 export default function ProductsPage() {
     const {
@@ -138,7 +148,7 @@ export default function ProductsPage() {
     };
 
     return (
-        <div className='flex h-screen bg-gray-50' style={{ backgroundColor: theme.background }}>
+        <div className='flex h-screen bg-gray-50' style={{backgroundColor: theme.background}}>
             <Toaster
                 richColors
                 toastOptions={{
@@ -154,7 +164,10 @@ export default function ProductsPage() {
                 <main className='flex-1 overflow-y-auto p-4 pb-20 lg:pb-0'>
                     <div className='space-y-6'>
                         <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6'>
-                            <h1 className='text-2xl font-bold' style={{ color: theme.text }}>Products</h1>
+                            <div className="flex flex-row gap-2">
+                                <Package style={{color: theme.primary}}/>
+                                <h1 className='text-2xl font-bold' style={{color: theme.primary}}>Products</h1>
+                            </div>
 
                             <div className='flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0'>
                                 <div className='relative'>
@@ -164,20 +177,20 @@ export default function ProductsPage() {
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         className='pl-10'
-                                        style={{ borderColor: theme.accent }}
+                                        style={{borderColor: theme.accent}}
                                     />
                                     <Search
                                         className='absolute left-3 top-2.5'
                                         size={18}
-                                        style={{ color: theme.primary }}
+                                        style={{color: theme.primary}}
                                     />
                                 </div>
                                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                                     <SelectTrigger
                                         className='w-full sm:w-40'
-                                        style={{ borderColor: theme.accent }}
+                                        style={{borderColor: theme.accent}}
                                     >
-                                        <SelectValue placeholder='Category' />
+                                        <SelectValue placeholder='Category'/>
                                     </SelectTrigger>
                                     <SelectContent>
                                         {categories.map(category => (
@@ -196,7 +209,7 @@ export default function ProductsPage() {
                                                 color: 'white',
                                             }}
                                         >
-                                            <Plus size={16} className='mr-1' /> Add Product
+                                            <Plus size={16} className='mr-1'/> Add Product
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className='sm:max-w-[600px]'>
@@ -229,14 +242,15 @@ export default function ProductsPage() {
                                                 borderColor: theme.secondary,
                                             }}
                                         >
-                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Image</th>
-                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Name</th>
-                                            <th className='text-left py-3 px-4 hidden sm:table-cell' style={{ color: theme.text }}>
+                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Image</th>
+                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Name</th>
+                                            <th className='text-left py-3 px-4 hidden sm:table-cell'
+                                                style={{color: theme.text}}>
                                                 Category
                                             </th>
-                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Price</th>
-                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Stock</th>
-                                            <th className='text-left py-3 px-4' style={{ color: theme.text }}>Actions</th>
+                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Price</th>
+                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Stock</th>
+                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Actions</th>
                                         </tr>
                                         </thead>
                                         <tbody>
@@ -263,7 +277,7 @@ export default function ProductsPage() {
                                                 <tr
                                                     key={product.productId}
                                                     className='border-b hover:bg-gray-50'
-                                                    style={{ borderColor: theme.secondary }}
+                                                    style={{borderColor: theme.secondary}}
                                                 >
                                                     <td className='py-3 px-4'>
                                                         <div className='w-12 h-12 rounded overflow-hidden bg-gray-100'>
@@ -311,7 +325,7 @@ export default function ProductsPage() {
                                                                     color: theme.text,
                                                                 }}
                                                             >
-                                                                <Edit size={14} />
+                                                                <Edit size={14}/>
                                                             </Button>
                                                             <Button
                                                                 variant='outline'
@@ -322,7 +336,7 @@ export default function ProductsPage() {
                                                                     color: '#EF4444',
                                                                 }}
                                                             >
-                                                                <Trash2 size={14} />
+                                                                <Trash2 size={14}/>
                                                             </Button>
                                                         </div>
                                                     </td>

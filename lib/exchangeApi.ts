@@ -1,4 +1,4 @@
-import { getCachedExchangeRate, saveExchangeRateToCache } from './cache/exchangeCache';
+import {getCachedExchangeRate, saveExchangeRateToCache} from './cache/exchangeCache';
 
 const API_KEY = process.env.NEXT_PUBLIC_EXCHANGE_RATE_API_KEY || '';
 const API_BASE_URL = 'https://v6.exchangerate-api.com/v6';
@@ -77,7 +77,6 @@ export const fetchExchangeRates = async (baseCurrency: string = 'USD'): Promise<
         const data: ExchangeRateResponse = await response.json();
         console.log(`Received rates for ${baseCurrency}:`, data.conversion_rates);
 
-        // Store rates in cache
         for (const toCurrency of toCurrencies) {
             if (baseCurrency === toCurrency) continue;
 
