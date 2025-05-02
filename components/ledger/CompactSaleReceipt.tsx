@@ -29,7 +29,7 @@ interface ReceiptProps {
     };
 }
 
-const CompactReceipt: React.FC<ReceiptProps> = ({sale, customers, businessInfo}) => {
+const CompactSaleReceipt: React.FC<ReceiptProps> = ({sale, customers, businessInfo}) => {
     const formatDate = (timestamp: Timestamp) => {
         return format(timestamp.toDate(), 'MMM dd, yyyy • h:mm a');
     };
@@ -128,4 +128,4 @@ const CompactReceipt: React.FC<ReceiptProps> = ({sale, customers, businessInfo})
     );
 };
 
-export default CompactReceipt;
+export default CompactSaleReceipt;

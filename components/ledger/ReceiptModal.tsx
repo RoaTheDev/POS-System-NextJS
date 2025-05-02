@@ -4,15 +4,18 @@ import {Printer} from 'lucide-react';
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {SaleHistory} from '@/lib/types/saleType';
+import {ServiceHistory} from '@/lib/types/serviceType';
 import {Customer} from '@/lib/stores/saleStore';
-import CompactReceipt from './CompactReceipt';
+import CompactSaleReceipt from './CompactSaleReceipt';
+import CompactServiceReceipt from './CompactServiceReceipt';
 import {printReceipt} from '@/lib/utils/receiptUtil';
 
 interface ReceiptModalProps {
     open: boolean;
     onClose: () => void;
-    sale: SaleHistory | null;
+    transactionData: SaleHistory | ServiceHistory | null;
     customers: Record<string, Customer>;
+    transactionType: 'sale' | 'service';
 }
 
 const BUSINESS_INFO = {
@@ -21,7 +24,9 @@ const BUSINESS_INFO = {
     phone: '092453358',
 };
 
-const ReceiptModal: React.FC<ReceiptModalProps> = ({open, onClose, sale, customers}) => {
+const ReceiptModal: React.FC<ReceiptModalProps> = ({
+                                                       open, onClose, transactionData, customers, transactionType
+                                                   }) => {
     const [isLoading, setIsLoading] = useState<string | null>(null);
 
     const handlePrint = () => {
@@ -32,27 +37,31 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({open, onClose, sale, custome
         }, 100);
     };
 
-
-    if (!sale) return null;
+    if (!transactionData) return null;
 
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader onClick={onClose} className="flex flex-row items-center justify-between">
                     <DialogTitle style={{color: theme.primary}}>Receipt</DialogTitle>
-
                 </DialogHeader>
 
-                {/* Receipt Content */}
                 <div className="border rounded-md overflow-hidden">
-                    <CompactReceipt
-                        sale={sale}
-                        customers={customers}
-                        businessInfo={BUSINESS_INFO}
-                    />
+                    {transactionType === 'sale' ? (
+                        <CompactSaleReceipt
+                            sale={transactionData as SaleHistory}
+                            customers={customers}
+                            businessInfo={BUSINESS_INFO}
+                        />
+                    ) : (
+                        <CompactServiceReceipt
+                            service={transactionData as ServiceHistory}
+                            customers={customers}
+                            businessInfo={BUSINESS_INFO}
+                        />
+                    )}
                 </div>
 
-                {/* Action Buttons */}
                 <div className="mt-4 flex justify-center">
                     <Button
                         className="flex items-center justify-center gap-2"
@@ -68,7 +77,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({open, onClose, sale, custome
                         )}
                         Print
                     </Button>
-
                 </div>
             </DialogContent>
         </Dialog>

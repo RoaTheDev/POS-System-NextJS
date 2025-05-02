@@ -18,7 +18,7 @@ import {Customer} from "@/lib/stores/saleStore";
 import Pagination from '@/components/common/Pagination';
 import {Skeleton} from "@/components/ui/skeleton";
 import {SaleHistory} from "@/lib/types/saleType";
-import ReceiptModal from "@/components/sales/ReceiptModal";
+import ReceiptModal from "@/components/ledger/ReceiptModal";
 import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet";
 
 export default function LedgerPage() {
@@ -692,8 +692,9 @@ export default function LedgerPage() {
             <ReceiptModal
                 open={isReceiptModalOpen}
                 onClose={handleCloseReceiptModal}
-                sale={selectedSale}
+                transactionData={selectedSale}
                 customers={customers}
+                transactionType={'sale'}
             />
         </div>
     )
