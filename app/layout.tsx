@@ -13,7 +13,6 @@ const inter = Inter({subsets: ['latin']});
 export const metadata: Metadata = {
     title: 'Mai Sophany Sound POS',
     description: 'POS for Electronic',
-    manifest: '/manifest.webmanifest',
     icons: {
         icon: [{ url: "/favicon-196.png", sizes: "196x196", type: "image/png" }],
         apple: [{ url: "/apple-icon-180.png" }],
@@ -206,6 +205,7 @@ export const viewport: Viewport = {
 export default function RootLayout({children}: { children: React.ReactNode }) {
     return (
         <html lang="en">
+
         <body className={inter.className}>
         <ClientProviders>
             <AuthProvider>
