@@ -349,7 +349,7 @@ export default function ServiceLedgerPage() {
                         }}
                         onClick={() => router.push('/ledger')}
                     >
-                        Shen me
+                        Sales
                     </Button>
                 </div>
 

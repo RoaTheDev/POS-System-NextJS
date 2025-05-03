@@ -343,7 +343,7 @@ export default function LedgerPage() {
                         color: 'white',
                         cursor: 'pointer'
                     }} onClick={() => router.push('/ledger/service-ledger')}>
-                        Shen me
+                        Services
                     </Button>
                 </div>
                 <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
