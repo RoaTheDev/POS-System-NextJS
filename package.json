@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "vercel-build": "npm install --force && next build",
+    "vercel-build": "npm install --legacy-peer-deps && next build",
     "lint": "next lint"
   },
   "dependencies": {
