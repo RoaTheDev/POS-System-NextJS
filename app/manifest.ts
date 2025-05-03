@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
         name: "Mai Sophany Sound POS",
         short_name: "Sound POS",
         description: "POS for Electronic",
-        start_url: "/",
+        start_url: "/sales",
         display: "standalone",
         background_color: "#ffffff",
         theme_color: "#ffffff",
