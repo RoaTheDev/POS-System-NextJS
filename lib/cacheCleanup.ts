@@ -5,12 +5,18 @@ import { clearExpiredExchangeRates } from './cache/exchangeCache';
 const INACTIVE_CACHE_TTL = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL = 12 * 60 * 60 * 1000;
 
-export const setupCacheCleanup = async () => {
-    if (typeof window === 'undefined') return () => {};
+let isCleanupSetup = false;
 
-    const cleanupReactQueryCache = () => {
+export const setupCacheCleanup = async () => {
+    if (typeof window === 'undefined' || isCleanupSetup) {
+        return () => {};
+    }
+
+    isCleanupSetup = true;
+
+    const cleanupReactQueryCache = async () => {
         console.log('Cleaning up React Query cache...');
-        queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
             predicate: (query) => {
                 const lastUpdated = query.state.dataUpdatedAt;
                 return Date.now() - lastUpdated > INACTIVE_CACHE_TTL;
@@ -29,9 +35,11 @@ export const setupCacheCleanup = async () => {
     };
 
     const cleanupAllCaches = async () => {
-        cleanupReactQueryCache();
-        await cleanupImageCache();
-        await cleanupExchangeRateCache();
+        await Promise.all([
+            cleanupReactQueryCache(),
+            cleanupImageCache(),
+            cleanupExchangeRateCache(),
+        ]);
     };
 
     await cleanupAllCaches();
@@ -48,6 +56,7 @@ export const setupCacheCleanup = async () => {
     }, CLEANUP_INTERVAL);
 
     return () => {
+        isCleanupSetup = false;
         clearInterval(intervalId);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

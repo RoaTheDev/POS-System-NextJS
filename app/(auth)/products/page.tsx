@@ -1,6 +1,7 @@
 'use client';
 import {theme} from "@/lib/colorPattern";
 import {useEffect, useState} from 'react';
+import {usePathname} from 'next/navigation';
 import {useProductStore} from '@/lib/stores/productStore';
 import {ProductFormData, ProductType} from '@/lib/types/productType';
 import {Button} from '@/components/ui/button';
@@ -66,6 +67,14 @@ export default function ProductsPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    const pathname = usePathname();
+
+    useEffect(() => {
+        if (!isAddDialogOpen && !isEditDialogOpen && !isDeleteDialogOpen) {
+            window.scrollTo(0, 0);
+        }
+    }, [pathname, isAddDialogOpen, isEditDialogOpen, isDeleteDialogOpen]);
 
     useEffect(() => {
         fetchProducts(currentPage, itemsPerPage);
@@ -201,7 +210,7 @@ export default function ProductsPage() {
                                     </SelectContent>
                                 </Select>
 
-                                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} key="add-dialog">
                                     <DialogTrigger asChild>
                                         <Button
                                             style={{
@@ -359,7 +368,7 @@ export default function ProductsPage() {
                             </CardContent>
                         </Card>
 
-                        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} key="edit-dialog">
                             <DialogContent className='sm:max-w-[600px]'>
                                 <DialogHeader>
                                     <DialogTitle>Edit Product</DialogTitle>
@@ -379,7 +388,7 @@ export default function ProductsPage() {
                         </Dialog>
 
                         {/* Delete Confirmation Dialog */}
-                        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} key="delete-dialog">
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>

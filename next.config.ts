@@ -13,7 +13,6 @@ const nextConfig: NextConfig = withPWA({
     register: true,
 })({
     reactStrictMode: true,
-    swcMinify: true,
     output: 'standalone',
     async headers() {
         return [
@@ -26,7 +25,7 @@ const nextConfig: NextConfig = withPWA({
                     },
                     {
                         key: 'Cross-Origin-Embedder-Policy',
-                        value: 'require-corp',
+                        value: 'credentialless',
                     },
                 ],
             },
