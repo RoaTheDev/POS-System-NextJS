@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { useCustomers } from '@/lib/queries/saleQueries';
-import Link from "next/link";
 import {
     Dialog,
     DialogContent,
