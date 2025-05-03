@@ -181,7 +181,7 @@ export default function SalesPage() {
 
             const totalUSD = getTotal();
             const totalInSelectedCurrency = getTotalInCurrency();
-            const currentExchangeRate = currency !== 'USD' ? rates[currency] : 1;
+            const currentExchangeRate = currency !== 'USD' ? (1 / rates['USD']).toFixed(2) : 1;
 
             const saleData = {
                 saleId: `SALE-${Date.now()}`,
@@ -192,7 +192,7 @@ export default function SalesPage() {
                     price: item.price,
                 })),
                 totalAmount: totalUSD.toString(),
-                totalAmountInSelectedCurrency: totalInSelectedCurrency.toString() + getCurrencySymbol(),
+                totalAmountInSelectedCurrency: `${totalInSelectedCurrency.toFixed(2)}${getCurrencySymbol()}`,
                 paymentMethod,
                 currency,
                 exchangeRate: currentExchangeRate,

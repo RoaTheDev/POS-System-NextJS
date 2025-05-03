@@ -1,33 +1,34 @@
 'use client'
 
-import {useEffect, useState} from 'react'
-import {Book, CalendarIcon, Eye, FileText, Filter, Search, X} from 'lucide-react'
-import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
-import {db} from '@/lib/firebase'
-import {theme} from '@/lib/colorPattern'
-import {Card, CardContent} from '@/components/ui/card'
-import {Button} from '@/components/ui/button'
-import {Input} from '@/components/ui/input'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Badge} from '@/components/ui/badge'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
-import {Calendar as CalendarComponent} from '@/components/ui/calendar'
-import {format} from 'date-fns'
-import {Customer} from "@/lib/stores/saleStore";
-import Pagination from '@/components/common/Pagination';
-import {Skeleton} from "@/components/ui/skeleton";
-import {SaleHistory} from "@/lib/types/saleType";
-import ReceiptModal from "@/components/ledger/ReceiptModal";
-import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet";
+import { useEffect, useState } from 'react'
+import { Book, CalendarIcon, Eye, FileText, Filter, Search, X } from 'lucide-react'
+import { collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { theme } from '@/lib/colorPattern'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { format } from 'date-fns'
+import { Customer } from "@/lib/stores/saleStore"
+import Pagination from '@/components/common/Pagination'
+import { Skeleton } from "@/components/ui/skeleton"
+import ReceiptModal from "@/components/ledger/ReceiptModal"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {ServiceHistory} from "@/lib/types/serviceType";
 import {useRouter} from "next/navigation";
 
-export default function LedgerPage() {
-    const [sales, setSales] = useState<SaleHistory[]>([])
+
+export default function ServiceLedgerPage() {
+    const [services, setServices] = useState<ServiceHistory[]>([])
     const [customers, setCustomers] = useState<Record<string, Customer>>({})
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedSale, setSelectedSale] = useState<SaleHistory | null>(null)
+    const [selectedService, setSelectedService] = useState<ServiceHistory | null>(null)
     const [paymentFilter, setPaymentFilter] = useState<string>('all')
     const [currencyFilter, setCurrencyFilter] = useState<string>('all')
     const [dateFilter, setDateFilter] = useState<Date | null>(null)
@@ -64,28 +65,28 @@ export default function LedgerPage() {
     }, [])
 
     useEffect(() => {
-        const fetchSales = async () => {
+        const fetchServices = async () => {
             try {
                 setLoading(true)
 
-                const salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
+                const servicesQuery = query(
+                    collection(db, 'services'),
+                    orderBy('transactionDate', 'desc'),
                     limit(itemsPerPage)
                 )
 
-                const countQuery = query(collection(db, 'sales'))
+                const countQuery = query(collection(db, 'services'))
                 const countSnapshot = await getDocs(countQuery)
                 const total = countSnapshot.size
                 setTotalItems(total)
                 setTotalPages(Math.ceil(total / itemsPerPage))
 
-                const salesSnapshot = await getDocs(salesQuery)
+                const servicesSnapshot = await getDocs(servicesQuery)
 
                 const currencies = new Set<string>()
 
-                const salesData = salesSnapshot.docs.map(doc => {
-                    const data = doc.data() as SaleHistory;
+                const servicesData = servicesSnapshot.docs.map(doc => {
+                    const data = doc.data() as ServiceHistory;
 
                     if (data.currency) {
                         currencies.add(data.currency)
@@ -93,29 +94,29 @@ export default function LedgerPage() {
 
                     return {
                         id: doc.id,
-                        saleId: data.saleId,
+                        serviceTransactionId: data.serviceTransactionId,
                         customerId: data.customerId,
-                        products: data.products,
+                        service: data.service,
                         totalAmount: data.totalAmount,
                         totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
                         paymentMethod: data.paymentMethod,
                         currency: data.currency || 'USD',
                         exchangeRate: data.exchangeRate || 1,
-                        saleDate: data.saleDate,
+                        transactionDate: data.transactionDate,
                         customerName: customers[data.customerId]?.name || 'Unknown'
                     };
                 });
 
                 setAvailableCurrencies(Array.from(currencies))
-                setSales(salesData)
+                setServices(servicesData)
             } catch (error) {
-                console.error('Error fetching sales data:', error)
+                console.error('Error fetching services data:', error)
             } finally {
                 setLoading(false)
             }
         }
 
-        fetchSales()
+        fetchServices()
     }, [customers, dateFilter, itemsPerPage, currentPage])
 
     useEffect(() => {
@@ -133,26 +134,26 @@ export default function LedgerPage() {
 
             const skipItems = (page - 1) * itemsPerPage
 
-            let salesQuery;
+            let servicesQuery;
 
             if (page === 1) {
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
+                servicesQuery = query(
+                    collection(db, 'services'),
+                    orderBy('transactionDate', 'desc'),
                     limit(itemsPerPage)
                 )
             } else {
                 const previousPageQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
+                    collection(db, 'services'),
+                    orderBy('transactionDate', 'desc'),
                     limit(skipItems)
                 )
                 const previousPageSnapshot = await getDocs(previousPageQuery)
                 const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1]
 
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
+                servicesQuery = query(
+                    collection(db, 'services'),
+                    orderBy('transactionDate', 'desc'),
                     startAfter(lastVisible),
                     limit(itemsPerPage)
                 )
@@ -165,36 +166,36 @@ export default function LedgerPage() {
                 const endOfDay = new Date(dateFilter)
                 endOfDay.setHours(23, 59, 59, 999)
 
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    where('saleDate', '>=', Timestamp.fromDate(startOfDay)),
-                    where('saleDate', '<=', Timestamp.fromDate(endOfDay)),
-                    orderBy('saleDate', 'desc'),
+                servicesQuery = query(
+                    collection(db, 'services'),
+                    where('transactionDate', '>=', Timestamp.fromDate(startOfDay)),
+                    where('transactionDate', '<=', Timestamp.fromDate(endOfDay)),
+                    orderBy('transactionDate', 'desc'),
                     limit(itemsPerPage)
                 )
             }
 
-            const salesSnapshot = await getDocs(salesQuery)
+            const servicesSnapshot = await getDocs(servicesQuery)
 
-            const salesData = salesSnapshot.docs.map(doc => {
-                const data = doc.data() as SaleHistory;
+            const servicesData = servicesSnapshot.docs.map(doc => {
+                const data = doc.data() as ServiceHistory;
 
                 return {
                     id: doc.id,
-                    saleId: data.saleId,
+                    serviceTransactionId: data.serviceTransactionId,
                     customerId: data.customerId,
-                    products: data.products,
+                    service: data.service,
                     totalAmount: data.totalAmount,
                     totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
                     paymentMethod: data.paymentMethod,
                     currency: data.currency || 'USD',
                     exchangeRate: data.exchangeRate || 1,
-                    saleDate: data.saleDate,
+                    transactionDate: data.transactionDate,
                     customerName: customers[data.customerId]?.name || 'Unknown'
                 };
             });
 
-            setSales(salesData)
+            setServices(servicesData)
         } catch (error) {
             console.error('Error changing page:', error)
         } finally {
@@ -209,18 +210,19 @@ export default function LedgerPage() {
         setTotalPages(Math.ceil(totalItems / newItemsPerPage))
     }
 
-    const filteredSales = sales.filter(sale => {
+    const filteredServices = services.filter(service => {
         const searchLower = searchQuery.toLowerCase()
-        const matchesSearch = sale.saleId.toLowerCase().includes(searchLower) ||
-            sale.customerName?.toLowerCase().includes(searchLower) ||
-            sale.products.some(p => p.productName?.toLowerCase().includes(searchLower))
+        const matchesSearch = service.serviceTransactionId.toLowerCase().includes(searchLower) ||
+            service.customerName?.toLowerCase().includes(searchLower) ||
+            service.service.serviceName?.toLowerCase().includes(searchLower) ||
+            service.service.description?.toLowerCase().includes(searchLower)
 
-        const matchesPayment = paymentFilter === 'all' || sale.paymentMethod === paymentFilter
+        const matchesPayment = paymentFilter === 'all' || service.paymentMethod === paymentFilter
 
-        const matchesCurrency = currencyFilter === 'all' || sale.currency === currencyFilter
+        const matchesCurrency = currencyFilter === 'all' || service.currency === currencyFilter
 
         const matchesDate = !dateFilter ||
-            (dateFilter && format(sale.saleDate.toDate(), 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd'))
+            (dateFilter && format(service.transactionDate.toDate(), 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd'))
 
         return matchesSearch && matchesPayment && matchesCurrency && matchesDate
     })
@@ -229,14 +231,14 @@ export default function LedgerPage() {
         return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')
     }
 
-    const handleViewSale = (sale: SaleHistory) => {
-        setSelectedSale(sale);
+    const handleViewService = (service: ServiceHistory) => {
+        setSelectedService(service);
         setIsReceiptModalOpen(true);
     };
 
     const handleCloseReceiptModal = () => {
         setIsReceiptModalOpen(false);
-        setSelectedSale(null);
+        setSelectedService(null);
     };
 
     const clearAllFilters = () => {
@@ -292,14 +294,14 @@ export default function LedgerPage() {
         ))
     }
 
-    const renderMobileCard = (sale: SaleHistory) => (
-        <div key={sale.saleId} className="p-4 border-b last:border-b-0">
+    const renderMobileCard = (service: ServiceHistory) => (
+        <div key={service.serviceTransactionId} className="p-4 border-b last:border-b-0">
             <div className="flex justify-between items-start mb-2">
-                <span className="font-medium">{sale.saleId}</span>
+                <span className="font-medium">{service.serviceTransactionId}</span>
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleViewSale(sale)}
+                    onClick={() => handleViewService(service)}
                     style={{color: theme.primary}}
                 >
                     <Eye size={16}/>
@@ -308,23 +310,23 @@ export default function LedgerPage() {
 
             <div className="grid grid-cols-2 gap-y-2 text-sm">
                 <span className="text-gray-500">Customer:</span>
-                <span>{sale.customerName}</span>
+                <span>{service.customerName}</span>
 
-                <span className="text-gray-500">Items:</span>
-                <span>{sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}</span>
+                <span className="text-gray-500">Service:</span>
+                <span>{service.service.serviceName}</span>
 
                 <span className="text-gray-500">Total:</span>
                 <span className="font-medium"
-                      style={{color: theme.primary}}>${Number(sale.totalAmount).toFixed(2)}</span>
+                      style={{color: theme.primary}}>${Number(service.totalAmount).toFixed(2)}</span>
 
                 <span className="text-gray-500">Payment:</span>
-                <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
-                    {formatPaymentMethod(sale.paymentMethod)}
+                <Badge style={getPaymentBadgeStyle(service.paymentMethod)}>
+                    {formatPaymentMethod(service.paymentMethod)}
                 </Badge>
 
                 <span className="text-gray-500">Currency:</span>
-                <Badge style={getCurrencyBadgeStyle(sale.currency)}>
-                    {sale.currency}
+                <Badge style={getCurrencyBadgeStyle(service.currency)}>
+                    {service.currency}
                 </Badge>
             </div>
         </div>
@@ -336,21 +338,26 @@ export default function LedgerPage() {
                 <div className="flex items-center mb-4 md:mb-0">
                     <Book style={{color: theme.primary}}/>
                     <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
-                        Sale Ledger
+                        Service Ledger
                     </h1>
-                    <Button className="ml-4 h-10 px-4" style={{
-                        backgroundColor: '#FF4B6A',
-                        color: 'white',
-                        cursor: 'pointer'
-                    }} onClick={() => router.push('/ledger/service-ledger')}>
+                    <Button
+                        className="ml-4 h-10 px-4"
+                        style={{
+                            backgroundColor: '#FF4B6A',
+                            color: 'white',
+                            cursor: 'pointer',
+                        }}
+                        onClick={() => router.push('/ledger')}
+                    >
                         Shen me
                     </Button>
                 </div>
+
                 <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="relative flex-grow md:flex-grow-0">
                         <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
                         <Input
-                            placeholder="Search sales..."
+                            placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10 h-10 w-full md:w-64"
@@ -425,7 +432,7 @@ export default function LedgerPage() {
                     <div className="relative flex-grow">
                         <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
                         <Input
-                            placeholder="Search sales..."
+                            placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10 h-10 w-full"
@@ -451,8 +458,8 @@ export default function LedgerPage() {
                         </SheetTrigger>
                         <SheetContent side="bottom" className="h-[90vh] rounded-t-xl">
                             <SheetHeader className="mb-4">
-                                <SheetTitle>Filter Sales</SheetTitle>
-                                <SheetDescription>Apply filters to refine your sales history</SheetDescription>
+                                <SheetTitle>Filter Services</SheetTitle>
+                                <SheetDescription>Apply filters to refine your service history</SheetDescription>
                             </SheetHeader>
 
                             <div className="flex flex-col h-full">
@@ -495,8 +502,7 @@ export default function LedgerPage() {
                                                 <SelectContent>
                                                     <SelectItem value="all">All Currencies</SelectItem>
                                                     {availableCurrencies.map(currency => (
-                                                        <SelectItem key={currency}
-                                                                    value={currency}>{currency}</SelectItem>
+                                                        <SelectItem key={currency} value={currency}>{currency}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -555,7 +561,6 @@ export default function LedgerPage() {
                 </div>
             </div>
 
-            {/* Active filters display (mobile) */}
             {activeFilters > 0 && (
                 <div className="md:hidden flex flex-wrap gap-2 mb-4">
                     {paymentFilter !== 'all' && (
@@ -598,9 +603,9 @@ export default function LedgerPage() {
                             <Table className="min-w-[640px] md:w-full">
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Sale ID</TableHead>
+                                        <TableHead>Service ID</TableHead>
                                         <TableHead className="hidden md:table-cell">Customer</TableHead>
-                                        <TableHead className="hidden md:table-cell">Items</TableHead>
+                                        <TableHead className="hidden md:table-cell">Service</TableHead>
                                         <TableHead>Total</TableHead>
                                         <TableHead className="hidden md:table-cell">Paid In</TableHead>
                                         <TableHead>Payment</TableHead>
@@ -612,16 +617,16 @@ export default function LedgerPage() {
                                 </TableBody>
                             </Table>
                         </div>
-                    ) : filteredSales.length === 0 ? (
+                    ) : filteredServices.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
                             <FileText size={48} className="mb-4 opacity-30"/>
                             <p className="text-lg font-medium" style={{color: theme.text}}>
-                                No sales found
+                                No services found
                             </p>
                             <p className="text-sm text-center px-4" style={{color: theme.text}}>
                                 {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
-                                    : 'Create your first sale to see it here'}
+                                    : 'Create your first service transaction to see it here'}
                             </p>
                             {(searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter) && (
                                 <Button variant="outline" className="mt-4" onClick={clearAllFilters}>
@@ -635,9 +640,9 @@ export default function LedgerPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Sale ID</TableHead>
+                                            <TableHead>Service ID</TableHead>
                                             <TableHead>Customer</TableHead>
-                                            <TableHead>Items</TableHead>
+                                            <TableHead>Service</TableHead>
                                             <TableHead>Total</TableHead>
                                             <TableHead>Paid In</TableHead>
                                             <TableHead>Payment</TableHead>
@@ -645,30 +650,28 @@ export default function LedgerPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredSales.map(sale => (
-                                            <TableRow key={sale.saleId}>
-                                                <TableCell className="font-medium">{sale.saleId}</TableCell>
-                                                <TableCell>{sale.customerName}</TableCell>
-                                                <TableCell>
-                                                    {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
-                                                </TableCell>
+                                        {filteredServices.map(service => (
+                                            <TableRow key={service.serviceTransactionId}>
+                                                <TableCell className="font-medium">{service.serviceTransactionId}</TableCell>
+                                                <TableCell>{service.customerName}</TableCell>
+                                                <TableCell>{service.service.serviceName}</TableCell>
                                                 <TableCell className="font-medium" style={{color: theme.primary}}>
-                                                    ${Number(sale.totalAmount).toFixed(2)}
+                                                    ${Number(service.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge
-                                                        style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                        style={getCurrencyBadgeStyle(service.currency)}>{service.currency}</Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
-                                                        {formatPaymentMethod(sale.paymentMethod)}
+                                                    <Badge style={getPaymentBadgeStyle(service.paymentMethod)}>
+                                                        {formatPaymentMethod(service.paymentMethod)}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleViewSale(sale)}
+                                                        onClick={() => handleViewService(service)}
                                                         style={{color: theme.primary}}
                                                     >
                                                         <Eye size={16}/>
@@ -681,7 +684,7 @@ export default function LedgerPage() {
                             </div>
 
                             <div className="md:hidden max-h-[calc(100vh-300px)] overflow-y-auto">
-                                {filteredSales.map(sale => renderMobileCard(sale))}
+                                {filteredServices.map(service => renderMobileCard(service))}
                             </div>
                         </>
                     )}
@@ -694,15 +697,15 @@ export default function LedgerPage() {
                 itemsPerPage={itemsPerPage}
                 onPageChangeAction={handlePageChange}
                 onItemsPerPageChangeAction={handleItemsPerPageChange}
-                itemName="sales"
+                itemName="services"
             />
 
             <ReceiptModal
                 open={isReceiptModalOpen}
                 onClose={handleCloseReceiptModal}
-                transactionData={selectedSale}
+                transactionData={selectedService}
                 customers={customers}
-                transactionType={'sale'}
+                transactionType={'service'}
             />
         </div>
     )

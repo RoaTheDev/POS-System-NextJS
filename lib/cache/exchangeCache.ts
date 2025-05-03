@@ -10,7 +10,7 @@ interface ExchangeRateDB extends DBSchema {
     };
 }
 
-const RATE_EXPIRATION = 3 * 60 * 60 * 1000; // 3 hours
+const RATE_EXPIRATION = 6 * 60 * 60 * 1000; // 3 hours
 
 class ExchangeRateCache {
     private readonly dbPromise: Promise<IDBPDatabase<ExchangeRateDB>>;
