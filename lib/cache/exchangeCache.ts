@@ -10,13 +10,22 @@ interface ExchangeRateDB extends DBSchema {
     };
 }
 
-const RATE_EXPIRATION = 6 * 60 * 60 * 1000; // 3 hours
+const RATE_EXPIRATION = 12 * 60 * 60 * 1000;
 
 class ExchangeRateCache {
     private readonly dbPromise: Promise<IDBPDatabase<ExchangeRateDB>>;
     private dbInitialized = false;
+    private readonly isSupported: boolean;
 
     constructor() {
+        this.isSupported = this.checkSupport();
+
+        if (!this.isSupported) {
+            console.warn('IndexedDB is not supported in this environment');
+            this.dbPromise = new Promise(() => {});
+            return;
+        }
+
         this.dbPromise = openDB<ExchangeRateDB>('exchange-rate-db', 1, {
             upgrade(db) {
                 if (!db.objectStoreNames.contains('exchange-rate-cache')) {
@@ -33,9 +42,25 @@ class ExchangeRateCache {
         });
     }
 
+    private checkSupport(): boolean {
+        if (typeof window === 'undefined') return false;
+        if (!window.indexedDB) return false;
+
+        try {
+            const testDb = window.indexedDB.open('test');
+            testDb.onerror = () => {
+                console.warn('IndexedDB access denied');
+                return false;
+            };
+            return true;
+        } catch (e) {
+            console.warn('IndexedDB check failed', e);
+            return false;
+        }
+    }
+
     async getRate(key: string): Promise<number | null> {
-        if (!this.dbInitialized) {
-            console.warn('Database not yet initialized when attempting to getRate');
+        if (!this.isSupported || !this.dbInitialized) {
             return null;
         }
 
@@ -63,8 +88,7 @@ class ExchangeRateCache {
     }
 
     async setRate(key: string, rate: number): Promise<void> {
-        if (!this.dbInitialized) {
-            console.warn('Database not yet initialized when attempting to setRate');
+        if (!this.isSupported || !this.dbInitialized) {
             return;
         }
 
@@ -78,8 +102,7 @@ class ExchangeRateCache {
     }
 
     async clearExpiredRates(): Promise<void> {
-        if (!this.dbInitialized) {
-            console.warn('Database not yet initialized when attempting to clearExpiredRates');
+        if (!this.isSupported || !this.dbInitialized) {
             return;
         }
 
@@ -104,25 +127,36 @@ class ExchangeRateCache {
 
 let exchangeRateCache: ExchangeRateCache | null = null;
 
-if (typeof window !== 'undefined') {
-    try {
-        exchangeRateCache = new ExchangeRateCache();
-    } catch (err) {
-        console.error('Failed to create exchange rate cache:', err);
+export const initExchangeRateCache = (): void => {
+    if (typeof window !== 'undefined' && !exchangeRateCache) {
+        try {
+            exchangeRateCache = new ExchangeRateCache();
+        } catch (err) {
+            console.error('Failed to create exchange rate cache:', err);
+        }
     }
-}
+};
 
 export const getCachedExchangeRate = async (key: string): Promise<number | null> => {
-    if (!exchangeRateCache) return null;
+    if (!exchangeRateCache) {
+        initExchangeRateCache();
+        if (!exchangeRateCache) return null;
+    }
     return await exchangeRateCache.getRate(key);
 };
 
 export const saveExchangeRateToCache = async (key: string, rate: number): Promise<void> => {
-    if (!exchangeRateCache) return;
+    if (!exchangeRateCache) {
+        initExchangeRateCache();
+        if (!exchangeRateCache) return;
+    }
     await exchangeRateCache.setRate(key, rate);
 };
 
 export const clearExpiredExchangeRates = async (): Promise<void> => {
-    if (!exchangeRateCache) return;
+    if (!exchangeRateCache) {
+        initExchangeRateCache();
+        if (!exchangeRateCache) return;
+    }
     await exchangeRateCache.clearExpiredRates();
 };

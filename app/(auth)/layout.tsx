@@ -102,7 +102,7 @@ export default function AuthenticatedLayout({
                                     onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
                                     aria-label="Settings"
                                     style={{
-                                        color: theme.primary, // Apply primary color to the button/icon
+                                        color: theme.primary,
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = `${theme.secondary}40`)}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
