@@ -693,7 +693,8 @@ export default function LedgerPage() {
                                                     ${Number(sale.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                    <Badge
+                                                        style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -753,7 +754,9 @@ export default function LedgerPage() {
             />
 
             <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
-                <DialogContent>
+                <DialogContent className="[&>button]:hidden"
+                               onEscapeKeyDown={(e) => e.preventDefault()}
+                               onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle style={{color: theme.primary}}>Confirm Deletion</DialogTitle>
                         <DialogDescription>
