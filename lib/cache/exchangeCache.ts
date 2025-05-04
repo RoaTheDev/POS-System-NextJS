@@ -79,7 +79,6 @@ class ExchangeRateCache {
                 return null;
             }
 
-            console.log(`Using cached rate for ${key}: ${cachedRate.rate}`);
             return cachedRate.rate;
         } catch (error) {
             console.error('Error getting rate from cache:', error);
@@ -93,7 +92,6 @@ class ExchangeRateCache {
         }
 
         try {
-            console.log(`Caching rate for ${key}: ${rate}`);
             const db = await this.dbPromise;
             await db.put('exchange-rate-cache', {rate, timestamp: Date.now()}, key);
         } catch (error) {

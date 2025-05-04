@@ -31,8 +31,18 @@ import ProductForm from '@/components/products/ProductForm';
 import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
 import Pagination from '@/components/common/Pagination';
 import CachedImage from '@/components/common/CacheImage';
+import {useQueryClient} from '@tanstack/react-query';
+import {
+    useAddProduct,
+    useDeleteProduct,
+    useFetchProducts,
+    useSearchProducts,
+    useUpdateProduct
+} from '@/lib/queries/productQueries';
 
-const categories = ['All',
+
+const categories = [
+    'All',
     'Speaker accessories',
     'Amplifier accessories',
     'Connector',
@@ -42,21 +52,11 @@ const categories = ['All',
     'Mixer/power',
     'Driver unit',
     'Microphone',
-    'Repair'];
+    'Repair'
+];
 
 export default function ProductsPage() {
-    const {
-        products,
-        isLoading,
-        error,
-        fetchProducts,
-        addProduct,
-        updateProduct,
-        deleteProduct,
-        searchProducts,
-        totalProducts,
-        totalPages,
-    } = useProductStore();
+    const {error} = useProductStore();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
@@ -69,6 +69,25 @@ export default function ProductsPage() {
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const pathname = usePathname();
+    const queryClient = useQueryClient();
+
+    const fetchProductsQuery = useFetchProducts(itemsPerPage);
+    const addProductMutation = useAddProduct();
+    const updateProductMutation = useUpdateProduct();
+    const deleteProductMutation = useDeleteProduct();
+    const searchProductsQuery = useSearchProducts(
+        searchTerm,
+        selectedCategory === 'All' ? undefined : selectedCategory,
+        itemsPerPage
+    );
+
+    const isSearching = searchTerm || selectedCategory !== 'All';
+
+    const activeQuery = isSearching ? searchProductsQuery : fetchProductsQuery;
+
+    const products: ProductType[] = activeQuery.data?.products || [];
+    const totalProducts = activeQuery.data?.totalProducts || 0;
+    const totalPages = activeQuery.data?.totalPages || 1;
 
     useEffect(() => {
         if (!isAddDialogOpen && !isEditDialogOpen && !isDeleteDialogOpen) {
@@ -77,23 +96,29 @@ export default function ProductsPage() {
     }, [pathname, isAddDialogOpen, isEditDialogOpen, isDeleteDialogOpen]);
 
     useEffect(() => {
-        fetchProducts(currentPage, itemsPerPage);
-    }, [fetchProducts, currentPage, itemsPerPage]);
+        if (!activeQuery.data) {
+            fetchProductsQuery.refetch();
+        }
+    }, [activeQuery.data, itemsPerPage, fetchProductsQuery]);
 
     useEffect(() => {
-        const timer = setTimeout(async () => {
-            setCurrentPage(1);
-            await searchProducts(searchTerm, selectedCategory === 'All' ? undefined : selectedCategory, 1, itemsPerPage);
+        const timer = setTimeout(() => {
+            if (isSearching) {
+                setCurrentPage(1);
+                searchProductsQuery.refetch();
+            }
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [searchTerm, selectedCategory, searchProducts, itemsPerPage]);
+    }, [isSearching, searchTerm, selectedCategory, itemsPerPage, searchProductsQuery]);
 
     const handleAddProduct = async (data: ProductFormData) => {
         try {
-            await addProduct(data);
+            await addProductMutation.mutateAsync(data);
             setIsAddDialogOpen(false);
             toast.success('Product added successfully');
+            await queryClient.invalidateQueries({queryKey: ['products']});
+            await fetchProductsQuery.refetch();
         } catch (error) {
             toast.error(`Failed to add product: ${(error as Error).message}`);
         }
@@ -103,10 +128,19 @@ export default function ProductsPage() {
         if (!editingProduct) return;
 
         try {
-            await updateProduct(editingProduct.productId, data);
+            await updateProductMutation.mutateAsync({
+                productId: editingProduct.productId,
+                productData: data
+            });
             setIsEditDialogOpen(false);
             setEditingProduct(null);
             toast.success('Product updated successfully');
+            await queryClient.invalidateQueries({queryKey: ['products']});
+            if (isSearching) {
+                await searchProductsQuery.refetch();
+            } else {
+                await fetchProductsQuery.refetch();
+            }
         } catch (error) {
             toast.error(`Failed to update product: ${(error as Error).message}`);
         }
@@ -116,15 +150,18 @@ export default function ProductsPage() {
         if (!deleteProductId) return;
 
         try {
-            await deleteProduct(deleteProductId);
+            await deleteProductMutation.mutateAsync(deleteProductId);
             setIsDeleteDialogOpen(false);
             setDeleteProductId(null);
             toast.success('Product deleted successfully');
-
+            await queryClient.invalidateQueries({queryKey: ['products']});
             if (products.length === 1 && currentPage > 1) {
                 setCurrentPage(currentPage - 1);
+            }
+            if (isSearching) {
+                await searchProductsQuery.refetch();
             } else {
-                await fetchProducts(currentPage, itemsPerPage);
+                await fetchProductsQuery.refetch();
             }
         } catch (error) {
             toast.error(`Failed to delete product: ${(error as Error).message}`);
@@ -143,17 +180,19 @@ export default function ProductsPage() {
 
     const handlePageChange = async (page: number) => {
         setCurrentPage(page);
-        if (searchTerm || selectedCategory !== 'All') {
-            await searchProducts(searchTerm, selectedCategory === 'All' ? undefined : selectedCategory, page, itemsPerPage);
+        // Refetch with the new page
+        if (isSearching) {
+            await searchProductsQuery.refetch();
         } else {
-            await fetchProducts(page, itemsPerPage);
+            await fetchProductsQuery.refetch();
         }
     };
 
-    const handleItemsPerPageChange = (value: string) => {
+    const handleItemsPerPageChange = async (value: string) => {
         const newItemsPerPage = parseInt(value, 10);
         setItemsPerPage(newItemsPerPage);
         setCurrentPage(1);
+        await queryClient.invalidateQueries({queryKey: ['products']});
     };
 
     return (
@@ -168,7 +207,6 @@ export default function ProductsPage() {
                     },
                 }}
             />
-
             <div className='flex-1 flex flex-col overflow-hidden'>
                 <main className='flex-1 overflow-y-auto p-4 pb-20 lg:pb-0'>
                     <div className='space-y-6'>
@@ -177,7 +215,6 @@ export default function ProductsPage() {
                                 <Package style={{color: theme.primary}}/>
                                 <h1 className='text-2xl font-bold' style={{color: theme.primary}}>Products</h1>
                             </div>
-
                             <div className='flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0'>
                                 <div className='relative'>
                                     <Input
@@ -209,7 +246,6 @@ export default function ProductsPage() {
                                         ))}
                                     </SelectContent>
                                 </Select>
-
                                 <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} key="add-dialog">
                                     <DialogTrigger asChild>
                                         <Button
@@ -230,14 +266,13 @@ export default function ProductsPage() {
                                         </DialogHeader>
                                         <ProductForm
                                             onSubmitAction={handleAddProduct}
-                                            isLoading={isLoading}
+                                            isLoading={addProductMutation.isPending}
                                             categories={categories.filter(c => c !== 'All')}
                                         />
                                     </DialogContent>
                                 </Dialog>
                             </div>
                         </div>
-
                         {/* Products List */}
                         <Card>
                             <CardContent className='p-0'>
@@ -263,7 +298,7 @@ export default function ProductsPage() {
                                         </tr>
                                         </thead>
                                         <tbody>
-                                        {isLoading && !products.length ? (
+                                        {activeQuery.isPending && !products.length ? (
                                             <tr>
                                                 <td colSpan={6} className='py-8 text-center text-gray-500'>
                                                     Loading products...
@@ -289,39 +324,39 @@ export default function ProductsPage() {
                                                     style={{borderColor: theme.secondary}}
                                                 >
                                                     <td className='py-3 px-4'>
-                                                        <div className='w-12 h-12 rounded overflow-hidden bg-gray-100'>
+                                                        <div className='w-12 h-12 min-h-12 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
                                                             <CachedImage
-                                                                src={product.productImgUrl}
+                                                                src={product.productImgUrl.replace('c_fill,w_3840', 'c_fill,w_48,h_48')}
                                                                 alt={product.productName}
-                                                                width={50}
-                                                                height={50}
+                                                                width={48}
+                                                                height={48}
                                                                 cacheKey={`product_img_${product.productId}`}
                                                                 className='w-full h-full object-cover'
-                                                                sizes='50px'
+                                                                sizes='48px'
                                                             />
                                                         </div>
                                                     </td>
                                                     <td className='py-3 px-4'>{product.productName}</td>
                                                     <td className='py-3 px-4 hidden sm:table-cell'>
-                              <span
-                                  className='px-2 py-1 rounded-full text-xs'
-                                  style={{
-                                      backgroundColor: theme.secondary,
-                                      color: theme.text,
-                                  }}
-                              >
-                                {product.categoryName}
-                              </span>
+                                                            <span
+                                                                className='px-2 py-1 rounded-full text-xs'
+                                                                style={{
+                                                                    backgroundColor: theme.secondary,
+                                                                    color: theme.text,
+                                                                }}
+                                                            >
+                                                                {product.categoryName}
+                                                            </span>
                                                     </td>
                                                     <td className='py-3 px-4'>${product.price.toFixed(2)}</td>
                                                     <td className='py-3 px-4'>
-                              <span
-                                  className={`px-2 py-1 rounded-full text-xs ${
-                                      product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                  }`}
-                              >
-                                {product.stock}
-                              </span>
+                                                            <span
+                                                                className={`px-2 py-1 rounded-full text-xs ${
+                                                                    product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                                }`}
+                                                            >
+                                                                {product.stock}
+                                                            </span>
                                                     </td>
                                                     <td className='py-3 px-4'>
                                                         <div className='flex space-x-2'>
@@ -355,7 +390,6 @@ export default function ProductsPage() {
                                         </tbody>
                                     </table>
                                 </div>
-
                                 <Pagination
                                     currentPage={currentPage}
                                     totalPages={totalPages}
@@ -367,7 +401,6 @@ export default function ProductsPage() {
                                 />
                             </CardContent>
                         </Card>
-
                         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} key="edit-dialog">
                             <DialogContent className='sm:max-w-[600px]'>
                                 <DialogHeader>
@@ -380,13 +413,12 @@ export default function ProductsPage() {
                                     <ProductForm
                                         onSubmitAction={handleUpdateProduct}
                                         initialData={editingProduct}
-                                        isLoading={isLoading}
+                                        isLoading={updateProductMutation.isPending}
                                         categories={categories.filter(c => c !== 'All')}
                                     />
                                 )}
                             </DialogContent>
                         </Dialog>
-
                         {/* Delete Confirmation Dialog */}
                         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} key="delete-dialog">
                             <AlertDialogContent>

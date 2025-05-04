@@ -1,41 +1,53 @@
 'use client'
 
-import {useAuth} from '@/lib/stores/AuthContext'
+import {useAuth, UserRole} from '@/lib/stores/AuthContext'
 import {usePathname, useRouter} from 'next/navigation'
 import React, {useEffect} from 'react'
 import LoadingScreen from './LoadingScreen'
 
+interface RoleProtectedRouteProps {
+    children: React.ReactNode;
+    allowedRoles?: UserRole[];
+    redirectTo?: string;
+}
+
 export default function ProtectedRoute({
-                                           children
-                                       }: {
-    children: React.ReactNode
-}) {
-    const {user, loading} = useAuth()
+                                               children,
+                                               allowedRoles = ['user', 'admin'],
+                                               redirectTo = '/unauthorized'
+                                           }: RoleProtectedRouteProps) {
+    const {user, userWithRole, loading} = useAuth()
     const router = useRouter()
     const pathname = usePathname()
 
     useEffect(() => {
-        // If not loading and no user, redirect to login
         if (!loading && !user && pathname !== '/login') {
             router.push('/login')
         }
 
-        // If user is logged in and trying to access login page, redirect to products
         if (!loading && user && pathname === '/login') {
-            router.push('/products')
+            router.push('/sales')
         }
-    }, [user, loading, router, pathname])
 
-    // Show loading screen while checking auth state
+        if (!loading && user && userWithRole &&
+            !allowedRoles.includes(userWithRole.role) &&
+            pathname !== '/login' &&
+            pathname !== redirectTo) {
+            router.push(redirectTo)
+        }
+    }, [user, userWithRole, loading, router, pathname, allowedRoles, redirectTo])
+
     if (loading) {
         return <LoadingScreen/>
     }
 
-    // If on login page or authenticated, render children
-    if (pathname === '/login' || user) {
+    if (pathname === '/login') {
         return <>{children}</>
     }
 
-    // Don't render anything during redirect
+    if (user && userWithRole && allowedRoles.includes(userWithRole.role)) {
+        return <>{children}</>
+    }
+
     return <LoadingScreen/>
 }

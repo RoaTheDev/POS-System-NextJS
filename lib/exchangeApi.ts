@@ -58,7 +58,6 @@ export const fetchExchangeRates = async (baseCurrency: string = 'USD'): Promise<
         }
 
         if (allCached && Object.keys(cachedRates).length === toCurrencies.length) {
-            console.log('Using cached exchange rates', cachedRates);
             return cachedRates;
         }
 
@@ -67,7 +66,6 @@ export const fetchExchangeRates = async (baseCurrency: string = 'USD'): Promise<
             return FALLBACK_RATES[baseCurrency] || null;
         }
 
-        console.log(`Fetching fresh exchange rates for ${baseCurrency}`);
         const response = await fetch(`${API_BASE_URL}/${API_KEY}/latest/${baseCurrency}`);
 
         if (!response.ok) {
@@ -75,7 +73,6 @@ export const fetchExchangeRates = async (baseCurrency: string = 'USD'): Promise<
         }
 
         const data: ExchangeRateResponse = await response.json();
-        console.log(`Received rates for ${baseCurrency}:`, data.conversion_rates);
 
         for (const toCurrency of toCurrencies) {
             if (baseCurrency === toCurrency) continue;
@@ -103,7 +100,6 @@ export const getExchangeRate = async (fromCurrency: string, toCurrency: string):
         const cachedRate = await getCachedExchangeRate(cacheKey);
 
         if (cachedRate !== null) {
-            console.log(`Using cached rate for ${fromCurrency} to ${toCurrency}: ${cachedRate}`);
             return cachedRate;
         }
 
@@ -111,7 +107,6 @@ export const getExchangeRate = async (fromCurrency: string, toCurrency: string):
 
         if (rates && rates[toCurrency]) {
             const rate = rates[toCurrency];
-            console.log(`Got fresh rate for ${fromCurrency} to ${toCurrency}: ${rate}`);
             return rate;
         }
 

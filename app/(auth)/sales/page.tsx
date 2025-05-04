@@ -33,6 +33,7 @@ import {useCustomers, useFilteredProducts, useProducts} from '@/lib/queries/sale
 import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {CurrencyCode, useExchangeRates} from '@/lib/hooks/useExchangeRate';
+import {useQueryClient} from "@tanstack/react-query";
 
 const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
     'USD': '$',
@@ -41,6 +42,7 @@ const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
 };
 
 export default function SalesPage() {
+    const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
     const [customerSearchQuery, setCustomerSearchQuery] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -89,7 +91,20 @@ export default function SalesPage() {
         setSelectedCustomer,
         selectedCustomer
     } = useSalesStore();
+
     const router = useRouter();
+
+    useEffect(() => {
+        clearCart();
+        setSelectedCustomer(null);
+        setPaymentMethod('cash');
+        setCurrency('USD');
+        setSaleComplete(false);
+        setSaleId('');
+        return () => {
+            clearCart();
+        };
+    }, [clearCart, setSelectedCustomer]);
 
     useEffect(() => {
         setCartCount(cart.reduce((total, item) => total + item.quantity, 0));
@@ -187,6 +202,7 @@ export default function SalesPage() {
                 saleId: `SALE-${Date.now()}`,
                 customerId: selectedCustomer.customerId,
                 products: cart.map(item => ({
+                    productId: item.productId,
                     productName: item.productName,
                     quantity: item.quantity,
                     price: item.price,
@@ -215,6 +231,9 @@ export default function SalesPage() {
 
             await Promise.all(updatePromises);
 
+            await queryClient.invalidateQueries({ queryKey: ['products'] });
+            await queryClient.invalidateQueries({ queryKey: ['products', 'search'] });
+
             setSaleId(saleData.saleId);
             setSaleComplete(true);
 
@@ -225,9 +244,7 @@ export default function SalesPage() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleNewSale = () => {
+    };    const handleNewSale = () => {
         clearCart();
         setSelectedCustomer(null);
         setPaymentMethod('cash');
@@ -528,7 +545,8 @@ export default function SalesPage() {
                                     <SelectContent>
                                         <SelectItem value="cash">Cash</SelectItem>
                                         <SelectItem value="card">Card</SelectItem>
-                                        <SelectItem value="bank_transfer">ABA</SelectItem>
+                                        <SelectItem value="aba">ABA</SelectItem>
+                                        <SelectItem value="acleda">Acleda</SelectItem>
                                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                                     </SelectContent>
                                 </Select>

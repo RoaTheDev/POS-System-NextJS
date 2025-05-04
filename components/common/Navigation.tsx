@@ -1,23 +1,37 @@
 'use client'
 
+'use client'
+
 import {usePathname, useRouter} from 'next/navigation'
 import {Book, BookA, Package, ShoppingCart, User2} from 'lucide-react'
 import {theme} from '@/lib/colorPattern'
+import {useAuth} from '@/lib/stores/AuthContext'
+import {useEffect, useRef} from 'react'
 
 export default function Navigation() {
     const pathname = usePathname()
     const router = useRouter()
+    const {userWithRole} = useAuth()
+
+    const lastValidPageRef = useRef<string | null>(null)
 
     const navItems = [
         {name: 'sales', label: 'Sales', icon: ShoppingCart, path: '/sales'},
-        {name: 'service', label: 'service', icon: BookA, path: '/serviceEntry'},
+        {name: 'service', label: 'Service', icon: BookA, path: '/serviceEntry'},
         {name: 'products', label: 'Products', icon: Package, path: '/products'},
-        {name: 'customers', label: "Customers", icon: User2, path: '/customers'},
-        {name: 'ledger', label: "Ledger", icon: Book, path: '/ledger'}
-    ]
+        {name: 'customers', label: 'Customers', icon: User2, path: '/customers'},
+        {name: 'ledger', label: 'Ledger', icon: Book, path: '/ledger'}
+    ].filter(item => !(item.name === 'products' && userWithRole?.role === 'user'))
 
-    const activePage = navItems.find(item => pathname === item.path)?.name || 'dashboard'
+    const currentPage = navItems.find(item => pathname === item.path)?.name
 
+    useEffect(() => {
+        if (currentPage) {
+            lastValidPageRef.current = currentPage
+        }
+    }, [currentPage])
+
+    const activePage = currentPage || lastValidPageRef.current || navItems[0].name
 
     const Sidebar = () => (
         <div
@@ -50,7 +64,6 @@ export default function Navigation() {
                     ))}
                 </ul>
             </nav>
-
         </div>
     )
 

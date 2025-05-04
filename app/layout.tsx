@@ -6,6 +6,7 @@ import {AuthProvider} from '@/lib/stores/AuthContext';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import {ClientProviders} from '@/app/clientProviders';
 import React from "react";
+import {UnauthorizedModalProvider} from "@/lib/stores/UnathorizedModalStore";
 
 const inter = Inter({subsets: ['latin']});
 
@@ -14,8 +15,8 @@ export const metadata: Metadata = {
     title: 'Mai Sophany Sound POS',
     description: 'POS for Electronic',
     icons: {
-        icon: [{ url: "/favicon-196.png", sizes: "196x196", type: "image/png" }],
-        apple: [{ url: "/apple-icon-180.png" }],
+        icon: [{url: "/favicon-196.png", sizes: "196x196", type: "image/png"}],
+        apple: [{url: "/apple-icon-180.png"}],
     },
     appleWebApp: {
         capable: true,
@@ -209,9 +210,11 @@ export default function RootLayout({children}: { children: React.ReactNode }) {
         <body className={inter.className}>
         <ClientProviders>
             <AuthProvider>
-                <ProtectedRoute>
-                    {children}
-                </ProtectedRoute>
+                <UnauthorizedModalProvider>
+                    <ProtectedRoute>
+                        {children}
+                    </ProtectedRoute>
+                </UnauthorizedModalProvider>
             </AuthProvider>
             <Toaster/>
         </ClientProviders>

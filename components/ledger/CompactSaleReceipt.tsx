@@ -3,17 +3,14 @@ import {format} from 'date-fns';
 import {theme} from '@/lib/colorPattern';
 import {Timestamp} from 'firebase/firestore';
 import {Customer} from '@/lib/stores/saleStore';
+import {SaleProduct} from "@/lib/types/saleType";
 
 interface ReceiptProps {
     sale: {
         saleId: string;
         customerId: string;
         customerName?: string;
-        products:  {
-            productName: string;
-            quantity: number;
-            price: number;
-        }[];
+        products: SaleProduct[];
         totalAmount: string;
         totalAmountInSelectedCurrency?: string;
         paymentMethod: string;

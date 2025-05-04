@@ -1,27 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Book, CalendarIcon, Eye, FileText, Filter, Search, X } from 'lucide-react'
-import { collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { theme } from '@/lib/colorPattern'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar as CalendarComponent } from '@/components/ui/calendar'
-import { format } from 'date-fns'
-import { Customer } from "@/lib/stores/saleStore"
+import {useEffect, useState} from 'react'
+import {Book, CalendarIcon, Eye, FileText, Filter, RefreshCcw, Search, Trash2, X} from 'lucide-react'
+import {
+    collection,
+    deleteDoc,
+    doc,
+    getDocs,
+    limit,
+    orderBy,
+    query,
+    startAfter,
+    Timestamp,
+    where
+} from 'firebase/firestore'
+import {db} from '@/lib/firebase'
+import {theme} from '@/lib/colorPattern'
+import {Card, CardContent} from '@/components/ui/card'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Badge} from '@/components/ui/badge'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
+import {Calendar as CalendarComponent} from '@/components/ui/calendar'
+import {format} from 'date-fns'
+import {Customer} from "@/lib/stores/saleStore"
 import Pagination from '@/components/common/Pagination'
-import { Skeleton } from "@/components/ui/skeleton"
+import {Skeleton} from "@/components/ui/skeleton"
 import ReceiptModal from "@/components/ledger/ReceiptModal"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import {ServiceHistory} from "@/lib/types/serviceType";
-import {useRouter} from "next/navigation";
-
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
+import {ServiceHistory} from "@/lib/types/serviceType"
+import {useRouter} from "next/navigation"
+import {useAuth} from '@/lib/stores/AuthContext'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {toast} from 'sonner'
 
 export default function ServiceLedgerPage() {
     const [services, setServices] = useState<ServiceHistory[]>([])
@@ -29,6 +42,7 @@ export default function ServiceLedgerPage() {
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedService, setSelectedService] = useState<ServiceHistory | null>(null)
+    const [serviceToDelete, setServiceToDelete] = useState<ServiceHistory | null>(null)
     const [paymentFilter, setPaymentFilter] = useState<string>('all')
     const [currencyFilter, setCurrencyFilter] = useState<string>('all')
     const [dateFilter, setDateFilter] = useState<Date | null>(null)
@@ -40,7 +54,10 @@ export default function ServiceLedgerPage() {
     const [totalPages, setTotalPages] = useState(1)
     const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
     const [activeFilters, setActiveFilters] = useState(0)
-    const router = useRouter();
+    const router = useRouter()
+    const {userWithRole} = useAuth()
+    const isAdmin = userWithRole?.role === 'admin'
+
     useEffect(() => {
         const fetchCustomers = async () => {
             try {
@@ -103,7 +120,7 @@ export default function ServiceLedgerPage() {
                         currency: data.currency || 'USD',
                         exchangeRate: data.exchangeRate || 1,
                         transactionDate: data.transactionDate,
-                        customerName: customers[data.customerId]?.name || 'Unknown'
+                        customerName: customers[data.customerId]?.name || 'Walk-in'
                     };
                 });
 
@@ -210,6 +227,24 @@ export default function ServiceLedgerPage() {
         setTotalPages(Math.ceil(totalItems / newItemsPerPage))
     }
 
+    const handleDeleteService = async () => {
+        if (!serviceToDelete) return;
+
+        try {
+            setLoading(true)
+            await deleteDoc(doc(db, 'services', serviceToDelete.id))
+            setServiceToDelete(null)
+            // Refetch services to update the list
+            await handlePageChange(currentPage)
+            toast.success('Service deleted successfully')
+        } catch (error) {
+            console.error('Error deleting service:', error)
+            toast.error('Failed to delete service')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const filteredServices = services.filter(service => {
         const searchLower = searchQuery.toLowerCase()
         const matchesSearch = service.serviceTransactionId.toLowerCase().includes(searchLower) ||
@@ -255,6 +290,10 @@ export default function ServiceLedgerPage() {
                 return {backgroundColor: '#4CAF50', color: 'white'}
             case 'card':
                 return {backgroundColor: '#2196F3', color: 'white'}
+            case 'aba':
+                return {backgroundColor: '#0047AB', color: 'white'}
+            case 'acleda':
+                return {backgroundColor: '#3F00FF', color: 'white'}
             case 'bank_transfer':
                 return {backgroundColor: '#9C27B0', color: 'white'}
             default:
@@ -298,14 +337,25 @@ export default function ServiceLedgerPage() {
         <div key={service.serviceTransactionId} className="p-4 border-b last:border-b-0">
             <div className="flex justify-between items-start mb-2">
                 <span className="font-medium">{service.serviceTransactionId}</span>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleViewService(service)}
-                    style={{color: theme.primary}}
-                >
-                    <Eye size={16}/>
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleViewService(service)}
+                        style={{color: theme.primary}}
+                    >
+                        <Eye size={16}/>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => isAdmin && setServiceToDelete(service)}
+                        className="text-red-500"
+                        disabled={!isAdmin}
+                    >
+                        <Trash2 size={16}/>
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-y-2 text-sm">
@@ -375,7 +425,8 @@ export default function ServiceLedgerPage() {
                             <SelectItem value="all">All Payments</SelectItem>
                             <SelectItem value="cash">Cash</SelectItem>
                             <SelectItem value="card">Card</SelectItem>
-                            <SelectItem value="bank_transfer">ABA</SelectItem>
+                            <SelectItem value="aba">ABA</SelectItem>
+                            <SelectItem value="acleda">Acleda</SelectItem>
                             <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                         </SelectContent>
                     </Select>
@@ -411,7 +462,6 @@ export default function ServiceLedgerPage() {
                                 mode="single"
                                 selected={dateFilter ?? undefined}
                                 onSelect={handleDateSelect}
-                                initialFocus
                             />
                             {dateFilter && (
                                 <div className="p-2 border-t flex justify-end">
@@ -463,7 +513,6 @@ export default function ServiceLedgerPage() {
                             </SheetHeader>
 
                             <div className="flex flex-col h-full">
-                                {/* Scrollable container for filter inputs */}
                                 <div className="flex-1 overflow-y-auto pb-16">
                                     <div className="flex flex-col gap-4">
                                         <div>
@@ -502,7 +551,8 @@ export default function ServiceLedgerPage() {
                                                 <SelectContent>
                                                     <SelectItem value="all">All Currencies</SelectItem>
                                                     {availableCurrencies.map(currency => (
-                                                        <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+                                                        <SelectItem key={currency}
+                                                                    value={currency}>{currency}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -536,7 +586,6 @@ export default function ServiceLedgerPage() {
                                     </div>
                                 </div>
 
-                                {/* Fixed buttons at the bottom */}
                                 <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t">
                                     <div className="flex gap-2 max-w-md mx-auto">
                                         <Button
@@ -646,13 +695,14 @@ export default function ServiceLedgerPage() {
                                             <TableHead>Total</TableHead>
                                             <TableHead>Paid In</TableHead>
                                             <TableHead>Payment</TableHead>
-                                            <TableHead className="w-16">Actions</TableHead>
+                                            <TableHead className="w-24">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {filteredServices.map(service => (
                                             <TableRow key={service.serviceTransactionId}>
-                                                <TableCell className="font-medium">{service.serviceTransactionId}</TableCell>
+                                                <TableCell
+                                                    className="font-medium">{service.serviceTransactionId}</TableCell>
                                                 <TableCell>{service.customerName}</TableCell>
                                                 <TableCell>{service.service.serviceName}</TableCell>
                                                 <TableCell className="font-medium" style={{color: theme.primary}}>
@@ -668,14 +718,24 @@ export default function ServiceLedgerPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => handleViewService(service)}
-                                                        style={{color: theme.primary}}
-                                                    >
-                                                        <Eye size={16}/>
-                                                    </Button>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleViewService(service)}
+                                                        >
+                                                            <Eye size={20}/>
+                                                        </Button>
+                                                        {isAdmin && <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => isAdmin && setServiceToDelete(service)}
+                                                            className="text-red-500"
+                                                            disabled={!isAdmin}
+                                                        >
+                                                            <Trash2 size={20}/>
+                                                        </Button>}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -707,6 +767,57 @@ export default function ServiceLedgerPage() {
                 customers={customers}
                 transactionType={'service'}
             />
+
+            <Dialog open={!!serviceToDelete} onOpenChange={(open) => !open && setServiceToDelete(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle style={{color: theme.primary}}>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this service? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {serviceToDelete && (
+                        <div className="py-4">
+                            <div className="p-3 rounded-md" style={{backgroundColor: theme.light}}>
+                                <p className="font-medium" style={{color: theme.text}}>
+                                    {serviceToDelete.serviceTransactionId}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Customer: {serviceToDelete.customerName}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Service: {serviceToDelete.service.serviceName}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Total: ${Number(serviceToDelete.totalAmount).toFixed(2)}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setServiceToDelete(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteService}
+                            disabled={loading || !isAdmin}
+                        >
+                            {loading ? (
+                                <>
+                                    <RefreshCcw size={16} className="mr-2 animate-spin"/>
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 size={16} className="mr-2"/>
+                                    Delete Service
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

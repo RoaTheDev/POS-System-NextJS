@@ -1,7 +1,7 @@
 'use client'
 
 import {useEffect, useState} from 'react'
-import {Book, CalendarIcon, Eye, FileText, Filter, Search, X} from 'lucide-react'
+import {Book, CalendarIcon, Eye, FileText, Filter, RefreshCcw, Search, Trash2, X} from 'lucide-react'
 import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
 import {db} from '@/lib/firebase'
 import {theme} from '@/lib/colorPattern'
@@ -14,13 +14,18 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {Calendar as CalendarComponent} from '@/components/ui/calendar'
 import {format} from 'date-fns'
-import {Customer} from "@/lib/stores/saleStore";
-import Pagination from '@/components/common/Pagination';
-import {Skeleton} from "@/components/ui/skeleton";
-import {SaleHistory} from "@/lib/types/saleType";
-import ReceiptModal from "@/components/ledger/ReceiptModal";
-import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet";
-import {useRouter} from "next/navigation";
+import {Customer} from "@/lib/stores/saleStore"
+import Pagination from '@/components/common/Pagination'
+import {Skeleton} from "@/components/ui/skeleton"
+import {SaleHistory} from "@/lib/types/saleType"
+import ReceiptModal from "@/components/ledger/ReceiptModal"
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
+import {useRouter} from "next/navigation"
+import {useAuth} from '@/lib/stores/AuthContext'
+import DeleteSaleModal from '@/components/ledger/DeleteSaleModal'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {toast} from 'sonner'
+
 
 export default function LedgerPage() {
     const [sales, setSales] = useState<SaleHistory[]>([])
@@ -28,6 +33,8 @@ export default function LedgerPage() {
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedSale, setSelectedSale] = useState<SaleHistory | null>(null)
+    const [saleToDelete, setSaleToDelete] = useState<SaleHistory | null>(null)
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
     const [paymentFilter, setPaymentFilter] = useState<string>('all')
     const [currencyFilter, setCurrencyFilter] = useState<string>('all')
     const [dateFilter, setDateFilter] = useState<Date | null>(null)
@@ -39,7 +46,10 @@ export default function LedgerPage() {
     const [totalPages, setTotalPages] = useState(1)
     const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
     const [activeFilters, setActiveFilters] = useState(0)
-    const router = useRouter();
+    const router = useRouter()
+    const {userWithRole} = useAuth()
+    const isAdmin = userWithRole?.role === 'admin'
+
     useEffect(() => {
         const fetchCustomers = async () => {
             try {
@@ -209,6 +219,21 @@ export default function LedgerPage() {
         setTotalPages(Math.ceil(totalItems / newItemsPerPage))
     }
 
+    const handleDeleteSuccess = async () => {
+        await handlePageChange(currentPage)
+        toast.success('Sale deleted successfully')
+    }
+
+    const handleConfirmDelete = () => {
+        setConfirmDeleteOpen(false)
+        setSaleToDelete(saleToDelete)
+    }
+
+    const handleOpenConfirmDelete = (sale: SaleHistory) => {
+        setSaleToDelete(sale)
+        setConfirmDeleteOpen(true)
+    }
+
     const filteredSales = sales.filter(sale => {
         const searchLower = searchQuery.toLowerCase()
         const matchesSearch = sale.saleId.toLowerCase().includes(searchLower) ||
@@ -253,6 +278,10 @@ export default function LedgerPage() {
                 return {backgroundColor: '#4CAF50', color: 'white'}
             case 'card':
                 return {backgroundColor: '#2196F3', color: 'white'}
+            case 'aba':
+                return {backgroundColor: '#0047AB', color: 'white'}
+            case 'acleda':
+                return {backgroundColor: '#3F00FF', color: 'white'}
             case 'bank_transfer':
                 return {backgroundColor: '#9C27B0', color: 'white'}
             default:
@@ -296,14 +325,25 @@ export default function LedgerPage() {
         <div key={sale.saleId} className="p-4 border-b last:border-b-0">
             <div className="flex justify-between items-start mb-2">
                 <span className="font-medium">{sale.saleId}</span>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleViewSale(sale)}
-                    style={{color: theme.primary}}
-                >
-                    <Eye size={16}/>
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleViewSale(sale)}
+                        style={{color: theme.primary}}
+                    >
+                        <Eye size={16}/>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
+                        className="text-red-500"
+                        disabled={!isAdmin}
+                    >
+                        <Trash2 size={16}/>
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-y-2 text-sm">
@@ -368,7 +408,8 @@ export default function LedgerPage() {
                             <SelectItem value="all">All Payments</SelectItem>
                             <SelectItem value="cash">Cash</SelectItem>
                             <SelectItem value="card">Card</SelectItem>
-                            <SelectItem value="bank_transfer">ABA</SelectItem>
+                            <SelectItem value="aba">ABA</SelectItem>
+                            <SelectItem value="acleda">Acleda</SelectItem>
                             <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                         </SelectContent>
                     </Select>
@@ -404,7 +445,6 @@ export default function LedgerPage() {
                                 mode="single"
                                 selected={dateFilter ?? undefined}
                                 onSelect={handleDateSelect}
-                                initialFocus
                             />
                             {dateFilter && (
                                 <div className="p-2 border-t flex justify-end">
@@ -456,7 +496,6 @@ export default function LedgerPage() {
                             </SheetHeader>
 
                             <div className="flex flex-col h-full">
-                                {/* Scrollable container for filter inputs */}
                                 <div className="flex-1 overflow-y-auto pb-16">
                                     <div className="flex flex-col gap-4">
                                         <div>
@@ -530,7 +569,6 @@ export default function LedgerPage() {
                                     </div>
                                 </div>
 
-                                {/* Fixed buttons at the bottom */}
                                 <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t">
                                     <div className="flex gap-2 max-w-md mx-auto">
                                         <Button
@@ -555,7 +593,6 @@ export default function LedgerPage() {
                 </div>
             </div>
 
-            {/* Active filters display (mobile) */}
             {activeFilters > 0 && (
                 <div className="md:hidden flex flex-wrap gap-2 mb-4">
                     {paymentFilter !== 'all' && (
@@ -641,7 +678,7 @@ export default function LedgerPage() {
                                             <TableHead>Total</TableHead>
                                             <TableHead>Paid In</TableHead>
                                             <TableHead>Payment</TableHead>
-                                            <TableHead className="w-16">Actions</TableHead>
+                                            <TableHead className="w-24">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -665,14 +702,24 @@ export default function LedgerPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => handleViewSale(sale)}
-                                                        style={{color: theme.primary}}
-                                                    >
-                                                        <Eye size={16}/>
-                                                    </Button>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleViewSale(sale)}
+                                                        >
+                                                            <Eye size={20}/>
+                                                        </Button>
+                                                        {isAdmin && <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
+                                                            className="text-red-500"
+                                                            disabled={!isAdmin}
+                                                        >
+                                                            <Trash2 size={20}/>
+                                                        </Button>}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -703,6 +750,64 @@ export default function LedgerPage() {
                 transactionData={selectedSale}
                 customers={customers}
                 transactionType={'sale'}
+            />
+
+            <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle style={{color: theme.primary}}>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this sale? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {saleToDelete && (
+                        <div className="py-4">
+                            <div className="p-3 rounded-md" style={{backgroundColor: theme.light}}>
+                                <p className="font-medium" style={{color: theme.text}}>
+                                    {saleToDelete.saleId}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Customer: {saleToDelete.customerName}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Items: {saleToDelete.products.length} {saleToDelete.products.length === 1 ? 'item' : 'items'}
+                                </p>
+                                <p className="text-sm" style={{color: theme.text}}>
+                                    Total: ${Number(saleToDelete.totalAmount).toFixed(2)}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleConfirmDelete}
+                            disabled={loading || !isAdmin}
+                        >
+                            {loading ? (
+                                <>
+                                    <RefreshCcw size={16} className="mr-2 animate-spin"/>
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 size={16} className="mr-2"/>
+                                    Proceed to Delete
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <DeleteSaleModal
+                open={!!saleToDelete && !confirmDeleteOpen}
+                onClose={() => setSaleToDelete(null)}
+                sale={saleToDelete}
+                onSuccess={handleDeleteSuccess}
             />
         </div>
     )

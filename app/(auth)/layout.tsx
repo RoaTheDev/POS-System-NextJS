@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from "react"
+import React, {useEffect, useRef, useState} from "react"
 import Navigation from '@/components/common/Navigation'
-import { theme } from '@/lib/colorPattern'
-import { useAuth } from '@/lib/stores/AuthContext'
+import {theme} from '@/lib/colorPattern'
+import {useAuth} from '@/lib/stores/AuthContext'
 import LoadingScreen from '@/components/common/LoadingScreen'
-import { LogOut, User, X, Settings } from "lucide-react"
+import {LogOut, Settings, User, X} from "lucide-react"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -15,19 +15,21 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+import {Button} from "@/components/ui/button"
+import {usePathname, useRouter} from 'next/navigation'
 
 export default function AuthenticatedLayout({
                                                 children
                                             }: {
     children: React.ReactNode
 }) {
-    const { loading, logout, user } = useAuth()
+    const {loading, logout, user, userWithRole} = useAuth()
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
     const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
     const settingsMenuRef = useRef<HTMLDivElement>(null)
+    const pathname = usePathname()
+    const router = useRouter()
 
-    // Close settings menu when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
@@ -39,8 +41,26 @@ export default function AuthenticatedLayout({
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    useEffect(() => {
+        if (!loading && user && userWithRole) {
+            if (userWithRole.role === 'user' && pathname.startsWith('/products')) {
+                router.push('/sales')
+            }
+        }
+    }, [loading, user, userWithRole, pathname, router])
+
     if (loading) {
-        return <LoadingScreen />
+        return <LoadingScreen/>
+    }
+
+    if (!user) {
+        router.push('/login')
+        return <LoadingScreen/>
+    }
+
+    if (userWithRole?.role === 'user' && pathname.startsWith('/products')) {
+        router.push('unauthorized')
+        return <LoadingScreen/>
     }
 
     const handleLogout = async () => {
@@ -53,44 +73,43 @@ export default function AuthenticatedLayout({
 
     return (
         <div className="flex h-screen">
-            <Navigation />
+            <Navigation/>
 
             <main
                 className="flex-1 flex flex-col overflow-hidden sm:mb-2 mb-14"
-                style={{ backgroundColor: theme.background }}
+                style={{backgroundColor: theme.background}}
             >
                 <header
                     className='shadow-md z-10 sticky top-0'
-                    style={{ backgroundColor: theme.light }}
+                    style={{backgroundColor: theme.light}}
                 >
                     <div className='px-4 py-3 flex items-center justify-between'>
                         <div className='lg:hidden'>
                             <h1
                                 className='text-lg font-bold'
-                                style={{ color: theme.primary }}
+                                style={{color: theme.primary}}
                             >
                                 Mai Sophany Sound
                             </h1>
                         </div>
 
                         <div className='ml-auto flex items-center'>
-                            {/* User info */}
                             <div className="flex items-center mr-4">
                                 <div
                                     className='w-9 h-9 rounded-full flex items-center justify-center shadow-sm mr-3'
-                                    style={{ backgroundColor: theme.secondary }}
+                                    style={{backgroundColor: theme.secondary}}
                                 >
                                     {userInitial ? (
-                                        <span className="text-sm font-medium" style={{ color: theme.primary }}>
+                                        <span className="text-sm font-medium" style={{color: theme.primary}}>
                                             {userInitial}
                                         </span>
                                     ) : (
-                                        <User size={16} style={{ color: theme.primary }} />
+                                        <User size={16} style={{color: theme.primary}}/>
                                     )}
                                 </div>
                                 <p
                                     className="font-medium text-lg"
-                                    style={{ color: theme.text }}
+                                    style={{color: theme.text}}
                                 >
                                     {username}
                                 </p>
@@ -107,18 +126,17 @@ export default function AuthenticatedLayout({
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = `${theme.secondary}40`)}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                 >
-                                    <Settings size={20} />
+                                    <Settings size={20}/>
                                 </button>
 
-                                {/* Settings dropdown */}
                                 {settingsMenuOpen && (
                                     <div
                                         className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-20"
-                                        style={{ backgroundColor: theme.light }}
+                                        style={{backgroundColor: theme.light}}
                                     >
                                         <button
                                             className="w-full text-left px-4 py-3 flex items-center transition-all"
-                                            style={{ color: theme.text }}
+                                            style={{color: theme.text}}
                                             onClick={() => {
                                                 setSettingsMenuOpen(false)
                                                 setLogoutDialogOpen(true)
@@ -126,7 +144,7 @@ export default function AuthenticatedLayout({
                                             onMouseOver={(e) => e.currentTarget.style.backgroundColor = `${theme.secondary}40`}
                                             onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                         >
-                                            <LogOut size={18} className="mr-2" />
+                                            <LogOut size={18} className="mr-2"/>
                                             Logout
                                         </button>
                                     </div>
@@ -144,13 +162,13 @@ export default function AuthenticatedLayout({
             <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
                 <AlertDialogContent
                     className="rounded-lg border-0 shadow-lg"
-                    style={{ backgroundColor: theme.light }}
+                    style={{backgroundColor: theme.light}}
                 >
                     <AlertDialogHeader>
                         <div className="flex items-center justify-between">
                             <AlertDialogTitle
                                 className="text-xl font-bold"
-                                style={{ color: theme.primary }}
+                                style={{color: theme.primary}}
                             >
                                 Confirm Logout
                             </AlertDialogTitle>
@@ -159,9 +177,9 @@ export default function AuthenticatedLayout({
                                 size="icon"
                                 onClick={() => setLogoutDialogOpen(false)}
                                 className="h-6 w-6 rounded-full"
-                                style={{ color: theme.text }}
+                                style={{color: theme.text}}
                             >
-                                <X size={16} />
+                                <X size={16}/>
                             </Button>
                         </div>
                     </AlertDialogHeader>
@@ -169,19 +187,19 @@ export default function AuthenticatedLayout({
                         <div className="flex flex-col items-center py-4">
                             <div
                                 className="w-16 h-16 rounded-full mb-4 flex items-center justify-center"
-                                style={{ backgroundColor: theme.secondary }}
+                                style={{backgroundColor: theme.secondary}}
                             >
-                                <LogOut size={32} style={{ color: theme.primary }} />
+                                <LogOut size={32} style={{color: theme.primary}}/>
                             </div>
                             <p
                                 className="text-center mb-2 font-medium"
-                                style={{ color: theme.text }}
+                                style={{color: theme.text}}
                             >
                                 Are you sure you want to logout?
                             </p>
                             <p
                                 className="text-center text-sm opacity-80"
-                                style={{ color: theme.text }}
+                                style={{color: theme.text}}
                             >
                                 You will need to login again to access your account.
                             </p>
