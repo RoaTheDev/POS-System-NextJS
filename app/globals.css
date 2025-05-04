@@ -117,6 +117,10 @@
     @apply border-border outline-ring/50;
   }
   body {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     @apply bg-background text-foreground;
   }
 }

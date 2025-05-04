@@ -234,7 +234,6 @@ export default function ServiceLedgerPage() {
             setLoading(true)
             await deleteDoc(doc(db, 'services', serviceToDelete.id))
             setServiceToDelete(null)
-            // Refetch services to update the list
             await handlePageChange(currentPage)
             toast.success('Service deleted successfully')
         } catch (error) {
