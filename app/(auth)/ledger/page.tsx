@@ -334,7 +334,7 @@ export default function LedgerPage() {
                     >
                         <Eye size={16}/>
                     </Button>
-                    <Button
+                    {isAdmin && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
@@ -342,7 +342,7 @@ export default function LedgerPage() {
                         disabled={!isAdmin}
                     >
                         <Trash2 size={16}/>
-                    </Button>
+                    </Button>}
                 </div>
             </div>
 
@@ -693,8 +693,7 @@ export default function LedgerPage() {
                                                     ${Number(sale.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge
-                                                        style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                    <Badge style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -710,15 +709,16 @@ export default function LedgerPage() {
                                                         >
                                                             <Eye size={20}/>
                                                         </Button>
-                                                        {isAdmin && <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
-                                                            className="text-red-500"
-                                                            disabled={!isAdmin}
-                                                        >
-                                                            <Trash2 size={20}/>
-                                                        </Button>}
+                                                        {isAdmin && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => handleOpenConfirmDelete(sale)}
+                                                                className="text-red-500"
+                                                            >
+                                                                <Trash2 size={20}/>
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -779,7 +779,10 @@ export default function LedgerPage() {
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+                        <Button variant="outline" onClick={() => {
+                            setConfirmDeleteOpen(false);
+                            setSaleToDelete(null);
+                        }}>
                             Cancel
                         </Button>
                         <Button

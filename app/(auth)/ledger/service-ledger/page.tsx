@@ -346,7 +346,7 @@ export default function ServiceLedgerPage() {
                     >
                         <Eye size={16}/>
                     </Button>
-                    <Button
+                    {isAdmin && <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => isAdmin && setServiceToDelete(service)}
@@ -354,7 +354,7 @@ export default function ServiceLedgerPage() {
                         disabled={!isAdmin}
                     >
                         <Trash2 size={16}/>
-                    </Button>
+                    </Button>}
                 </div>
             </div>
 
