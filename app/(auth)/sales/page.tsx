@@ -71,15 +71,18 @@ export default function SalesPage() {
         hasNextPage,
         isLoading: isLoadingProducts,
         isFetchingNextPage
-    } = useProducts();
+    } = useProducts(9);
 
-    const {ref, inView} = useInView();
+    const { ref: loadMoreRef, inView } = useInView({
+        threshold: 0.25,
+        rootMargin: '100px 0px',
+    });
 
     useEffect(() => {
-        if (inView && hasNextPage && !isFetchingNextPage) {
+        if (inView && hasNextPage && !isFetchingNextPage && !searchQuery) {
             fetchNextPage();
         }
-    }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+    }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage, searchQuery]);
 
     const {
         cart,
@@ -244,7 +247,9 @@ export default function SalesPage() {
         } finally {
             setLoading(false);
         }
-    };    const handleNewSale = () => {
+    };
+
+    const handleNewSale = () => {
         clearCart();
         setSelectedCustomer(null);
         setPaymentMethod('cash');
@@ -327,53 +332,58 @@ export default function SalesPage() {
                         />
                     </div>
                 </div>
-                <div
-                    className="grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 sm:gap-4 overflow-y-auto pb-4">
+                <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 pb-4">
+                        {isLoadingProducts || isLoadingFiltered ? (
+                            <div className="col-span-full flex items-center justify-center h-40">
+                                <p style={{ color: theme.text }}>Loading products...</p>
+                            </div>
+                        ) : displayProducts.length === 0 ? (
+                            <div className="col-span-full flex items-center justify-center h-40 text-center">
+                                <p style={{ color: theme.text }}>No products found. Try a different search term.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {displayProducts.map((product) => (
+                                    <ProductCard
+                                        key={product.productId}
+                                        product={{
+                                            ...product,
+                                            displayPrice: convertCurrency(product.price, 'USD', currency),
+                                        }}
+                                        addToCartAction={addToCart}
+                                        currencySymbol={getCurrencySymbol()}
+                                        cart={cart.find((p) => p.productId === product.productId)?.quantity || 0}
+                                    />
+                                ))}
+                            </>
+                        )}
+                    </div>
 
-                    {isLoadingProducts || isLoadingFiltered ? (
-                        <div className="col-span-full flex items-center justify-center h-40">
-                            <p style={{color: theme.text}}>Loading products...</p>
-                        </div>
-                    ) : displayProducts.length === 0 ? (
-                        <div className="col-span-full flex items-center justify-center h-40 text-center">
-                            <p style={{color: theme.text}}>
-                                No products found. Try a different search term.
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            {displayProducts.map((product) => (
-                                <ProductCard
-                                    key={product.productId}
-                                    product={{
-                                        ...product,
-                                        displayPrice: convertCurrency(product.price, 'USD', currency)
-                                    }}
-                                    addToCartAction={addToCart}
-                                    currencySymbol={getCurrencySymbol()}
-                                    cart={cart.find(p => p.productId === product.productId)?.quantity || 0}
-                                />
-                            ))}
-                            {!searchQuery && hasNextPage && (
-                                <div
-                                    ref={ref}
-                                    className="col-span-full flex justify-center my-4"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => fetchNextPage()}
-                                        disabled={isFetchingNextPage}
-                                    >
-                                        {isFetchingNextPage ? (
-                                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>
-                                        ) : (
-                                            <ChevronDown className="mr-2 h-4 w-4"/>
-                                        )}
-                                        {isFetchingNextPage ? 'Loading more...' : 'Load more products'}
-                                    </Button>
+                    {/* Dedicated loader element that's always rendered at the bottom of the list */}
+                    {!searchQuery && (
+                        <div
+                            ref={loadMoreRef}
+                            className="w-full py-4 flex justify-center"
+                        >
+                            {isFetchingNextPage ? (
+                                <div className="flex items-center justify-center p-4">
+                                    <RefreshCcw className="h-6 w-6 animate-spin mr-2" />
+                                    <span>Loading more products...</span>
                                 </div>
-                            )}
-                        </>
+                            ) : hasNextPage ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => fetchNextPage()}
+                                    className="mx-auto"
+                                >
+                                    <ChevronDown className="mr-2 h-4 w-4" />
+                                    Load more products
+                                </Button>
+                            ) : displayProducts.length > 0 ? (
+                                <p className="text-sm text-gray-500 py-2">No more products to load</p>
+                            ) : null}
+                        </div>
                     )}
                 </div>
             </div>
@@ -690,12 +700,11 @@ export default function SalesPage() {
                     onClick={() => setIsSaleSummaryExpanded(true)}
                 >
                     <div className="relative">
-                        <ShoppingCart size={24}/>
+                        <ShoppingCart size={24} />
                         {cartCount > 0 && (
-                            <span
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                                {cartCount}
-                            </span>
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                {cartCount}
+              </span>
                         )}
                     </div>
                 </Button>

@@ -22,3 +22,17 @@ export interface SaleHistory {
     saleDate: Timestamp;
     customerName?: string;
 }
+
+export interface SaleFilter {
+    searchQuery?: string;
+    paymentFilter: string;
+    currencyFilter: string;
+    dateFilter: Date | null;
+}
+
+export interface SalePagination {
+    currentPage: number;
+    itemsPerPage: number;
+    totalItems: number;
+    totalPages: number;
+}

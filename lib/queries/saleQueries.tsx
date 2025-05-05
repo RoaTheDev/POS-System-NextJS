@@ -6,10 +6,10 @@ import { Customer } from '@/lib/stores/saleStore';
 
 type ProductsPage = {
     products: ProductType[];
-    lastVisible: string | undefined;
+    lastVisible: any; // Changed to any to handle Firestore document reference
 };
 
-export const useProducts = (pageSize = 9) => {
+export const useProducts = (pageSize = 20) => { // Increased pageSize to 20
     return useInfiniteQuery<ProductsPage>({
         queryKey: ['products'],
         queryFn: async ({ pageParam }) => {
@@ -31,7 +31,7 @@ export const useProducts = (pageSize = 9) => {
             }
 
             const snapshot = await getDocs(q);
-            const lastVisible = snapshot.docs[snapshot.docs.length - 1]?.id;
+            const lastVisible = snapshot.docs[snapshot.docs.length - 1]; // Store the entire document reference
 
             const products = snapshot.docs.map(doc => ({
                 productId: doc.id,
@@ -41,11 +41,9 @@ export const useProducts = (pageSize = 9) => {
             return { products, lastVisible };
         },
         initialPageParam: null,
-        getNextPageParam: (lastPage) => lastPage?.lastVisible || undefined
+        getNextPageParam: (lastPage) => lastPage.lastVisible || undefined
     });
 };
-
-
 
 export const useFilteredProducts = (searchQuery: string) => {
     return useQuery({
@@ -64,9 +62,9 @@ export const useFilteredProducts = (searchQuery: string) => {
             })) as ProductType[];
 
             return products.filter(product =>
-                product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+        );
         },
         enabled: searchQuery.length > 0,
     });

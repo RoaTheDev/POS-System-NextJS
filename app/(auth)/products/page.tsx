@@ -1,12 +1,11 @@
-'use client';
-import {theme} from "@/lib/colorPattern";
-import {useEffect, useState} from 'react';
-import {usePathname} from 'next/navigation';
-import {useProductStore} from '@/lib/stores/productStore';
-import {ProductFormData, ProductType} from '@/lib/types/productType';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+'use client'
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useProductStore } from '@/lib/stores/productStore';
+import { ProductFormData, ProductType } from '@/lib/types/productType';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -15,31 +14,30 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import {Card, CardContent} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
+    AlertDialogFooter, AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {toast, Toaster} from 'sonner';
+import { toast, Toaster } from 'sonner';
 import ProductForm from '@/components/products/ProductForm';
-import {Edit, Package, Plus, Search, Trash2} from 'lucide-react';
+import { Edit, Package, Plus, Search, Trash2 } from 'lucide-react';
 import Pagination from '@/components/common/Pagination';
 import CachedImage from '@/components/common/CacheImage';
-import {useQueryClient} from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     useAddProduct,
     useDeleteProduct,
     useFetchProducts,
     useSearchProducts,
-    useUpdateProduct
+    useUpdateProduct,
 } from '@/lib/queries/productQueries';
-
+import { theme } from '@/lib/colorPattern';
 
 const categories = [
     'All',
@@ -52,13 +50,14 @@ const categories = [
     'Mixer/power',
     'Driver unit',
     'Microphone',
-    'Repair'
+    'Repair',
 ];
 
 export default function ProductsPage() {
-    const {error} = useProductStore();
+    const { error } = useProductStore();
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -71,23 +70,12 @@ export default function ProductsPage() {
     const pathname = usePathname();
     const queryClient = useQueryClient();
 
-    const fetchProductsQuery = useFetchProducts(itemsPerPage);
-    const addProductMutation = useAddProduct();
-    const updateProductMutation = useUpdateProduct();
-    const deleteProductMutation = useDeleteProduct();
-    const searchProductsQuery = useSearchProducts(
-        searchTerm,
-        selectedCategory === 'All' ? undefined : selectedCategory,
-        itemsPerPage
-    );
-
-    const isSearching = searchTerm || selectedCategory !== 'All';
-
-    const activeQuery = isSearching ? searchProductsQuery : fetchProductsQuery;
-
-    const products: ProductType[] = activeQuery.data?.products || [];
-    const totalProducts = activeQuery.data?.totalProducts || 0;
-    const totalPages = activeQuery.data?.totalPages || 1;
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         if (!isAddDialogOpen && !isEditDialogOpen && !isDeleteDialogOpen) {
@@ -95,29 +83,30 @@ export default function ProductsPage() {
         }
     }, [pathname, isAddDialogOpen, isEditDialogOpen, isDeleteDialogOpen]);
 
-    useEffect(() => {
-        if (!activeQuery.data) {
-            fetchProductsQuery.refetch();
-        }
-    }, [activeQuery.data, itemsPerPage, fetchProductsQuery]);
+    const fetchProductsQuery = useFetchProducts(itemsPerPage, currentPage);
+    const addProductMutation = useAddProduct();
+    const updateProductMutation = useUpdateProduct();
+    const deleteProductMutation = useDeleteProduct();
+    const searchProductsQuery = useSearchProducts(
+        debouncedSearchTerm,
+        selectedCategory === 'All' ? undefined : selectedCategory,
+        itemsPerPage,
+        currentPage
+    );
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (isSearching) {
-                setCurrentPage(1);
-                searchProductsQuery.refetch();
-            }
-        }, 300);
+    const isSearching = debouncedSearchTerm || selectedCategory !== 'All';
+    const activeQuery = isSearching ? searchProductsQuery : fetchProductsQuery;
 
-        return () => clearTimeout(timer);
-    }, [isSearching, searchTerm, selectedCategory, itemsPerPage, searchProductsQuery]);
+    const products: ProductType[] = activeQuery.data?.products || [];
+    const totalProducts = activeQuery.data?.totalProducts || 0;
+    const totalPages = activeQuery.data?.totalPages || 1;
 
     const handleAddProduct = async (data: ProductFormData) => {
         try {
             await addProductMutation.mutateAsync(data);
             setIsAddDialogOpen(false);
             toast.success('Product added successfully');
-            await queryClient.invalidateQueries({queryKey: ['products']});
+            await queryClient.invalidateQueries({ queryKey: ['products'] });
             await fetchProductsQuery.refetch();
         } catch (error) {
             toast.error(`Failed to add product: ${(error as Error).message}`);
@@ -130,12 +119,12 @@ export default function ProductsPage() {
         try {
             await updateProductMutation.mutateAsync({
                 productId: editingProduct.productId,
-                productData: data
+                productData: data,
             });
             setIsEditDialogOpen(false);
             setEditingProduct(null);
             toast.success('Product updated successfully');
-            await queryClient.invalidateQueries({queryKey: ['products']});
+            await queryClient.invalidateQueries({ queryKey: ['products'] });
             if (isSearching) {
                 await searchProductsQuery.refetch();
             } else {
@@ -154,7 +143,7 @@ export default function ProductsPage() {
             setIsDeleteDialogOpen(false);
             setDeleteProductId(null);
             toast.success('Product deleted successfully');
-            await queryClient.invalidateQueries({queryKey: ['products']});
+            await queryClient.invalidateQueries({ queryKey: ['products'] });
             if (products.length === 1 && currentPage > 1) {
                 setCurrentPage(currentPage - 1);
             }
@@ -180,7 +169,6 @@ export default function ProductsPage() {
 
     const handlePageChange = async (page: number) => {
         setCurrentPage(page);
-        // Refetch with the new page
         if (isSearching) {
             await searchProductsQuery.refetch();
         } else {
@@ -192,11 +180,11 @@ export default function ProductsPage() {
         const newItemsPerPage = parseInt(value, 10);
         setItemsPerPage(newItemsPerPage);
         setCurrentPage(1);
-        await queryClient.invalidateQueries({queryKey: ['products']});
+        await queryClient.invalidateQueries({ queryKey: ['products'] });
     };
 
     return (
-        <div className='flex h-screen bg-gray-50' style={{backgroundColor: theme.background}}>
+        <div className="flex h-screen bg-gray-50" style={{ backgroundColor: theme.background }}>
             <Toaster
                 richColors
                 toastOptions={{
@@ -207,39 +195,38 @@ export default function ProductsPage() {
                     },
                 }}
             />
-            <div className='flex-1 flex flex-col overflow-hidden'>
-                <main className='flex-1 overflow-y-auto p-4 pb-20 lg:pb-0'>
-                    <div className='space-y-6'>
-                        <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6'>
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <main className="flex-1 overflow-y-auto p-4 pb-20 lg:pb-0">
+                    <div className="space-y-6">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
                             <div className="flex flex-row gap-2">
-                                <Package style={{color: theme.primary}}/>
-                                <h1 className='text-2xl font-bold' style={{color: theme.primary}}>Products</h1>
+                                <Package style={{ color: theme.primary }} />
+                                <h1 className="text-2xl font-bold" style={{ color: theme.primary }}>
+                                    Products
+                                </h1>
                             </div>
-                            <div className='flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0'>
-                                <div className='relative'>
+                            <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+                                <div className="relative">
                                     <Input
-                                        type='text'
-                                        placeholder='Search products...'
+                                        type="text"
+                                        placeholder="Search products..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className='pl-10'
-                                        style={{borderColor: theme.accent}}
+                                        className="pl-10"
+                                        style={{ borderColor: theme.accent }}
                                     />
                                     <Search
-                                        className='absolute left-3 top-2.5'
+                                        className="absolute left-3 top-2.5"
                                         size={18}
-                                        style={{color: theme.primary}}
+                                        style={{ color: theme.primary }}
                                     />
                                 </div>
                                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                                    <SelectTrigger
-                                        className='w-full sm:w-40'
-                                        style={{borderColor: theme.accent}}
-                                    >
-                                        <SelectValue placeholder='Category'/>
+                                    <SelectTrigger className="w-full sm:w-40" style={{ borderColor: theme.accent }}>
+                                        <SelectValue placeholder="Category" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {categories.map(category => (
+                                        {categories.map((category) => (
                                             <SelectItem key={category} value={category}>
                                                 {category}
                                             </SelectItem>
@@ -254,10 +241,10 @@ export default function ProductsPage() {
                                                 color: 'white',
                                             }}
                                         >
-                                            <Plus size={16} className='mr-1'/> Add Product
+                                            <Plus size={16} className="mr-1" /> Add Product
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent className='sm:max-w-[600px]'>
+                                    <DialogContent className="sm:max-w-[600px]">
                                         <DialogHeader>
                                             <DialogTitle>Add New Product</DialogTitle>
                                             <DialogDescription>
@@ -267,120 +254,131 @@ export default function ProductsPage() {
                                         <ProductForm
                                             onSubmitAction={handleAddProduct}
                                             isLoading={addProductMutation.isPending}
-                                            categories={categories.filter(c => c !== 'All')}
+                                            categories={categories.filter((c) => c !== 'All')}
                                         />
                                     </DialogContent>
                                 </Dialog>
                             </div>
                         </div>
-                        {/* Products List */}
                         <Card>
-                            <CardContent className='p-0'>
-                                <div className='overflow-x-auto'>
-                                    <table className='w-full'>
+                            <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
                                         <thead>
                                         <tr
-                                            className='border-b'
+                                            className="border-b"
                                             style={{
                                                 backgroundColor: theme.light,
                                                 borderColor: theme.secondary,
                                             }}
                                         >
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Image</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Name</th>
-                                            <th className='text-left py-3 px-4 hidden sm:table-cell'
-                                                style={{color: theme.text}}>
+                                            <th className="text-left py-3 px-4" style={{ color: theme.text }}>
+                                                Image
+                                            </th>
+                                            <th className="text-left py-3 px-4" style={{ color: theme.text }}>
+                                                Name
+                                            </th>
+                                            <th
+                                                className="text-left py-3 px-4 hidden sm:table-cell"
+                                                style={{ color: theme.text }}
+                                            >
                                                 Category
                                             </th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Price</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Stock</th>
-                                            <th className='text-left py-3 px-4' style={{color: theme.text}}>Actions</th>
+                                            <th className="text-left py-3 px-4" style={{ color: theme.text }}>
+                                                Price
+                                            </th>
+                                            <th className="text-left py-3 px-4" style={{ color: theme.text }}>
+                                                Stock
+                                            </th>
+                                            <th className="text-left py-3 px-4" style={{ color: theme.text }}>
+                                                Actions
+                                            </th>
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {activeQuery.isPending && !products.length ? (
                                             <tr>
-                                                <td colSpan={6} className='py-8 text-center text-gray-500'>
+                                                <td colSpan={6} className="py-8 text-center text-gray-500">
                                                     Loading products...
                                                 </td>
                                             </tr>
                                         ) : error ? (
                                             <tr>
-                                                <td colSpan={6} className='py-8 text-center text-red-500'>
+                                                <td colSpan={6} className="py-8 text-center text-red-500">
                                                     Error: {error.message || 'An error occurred'}
                                                 </td>
                                             </tr>
                                         ) : products.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className='py-8 text-center text-gray-500'>
+                                                <td colSpan={6} className="py-8 text-center text-gray-500">
                                                     No products found. Add your first product!
                                                 </td>
                                             </tr>
                                         ) : (
-                                            products.map(product => (
+                                            products.map((product) => (
                                                 <tr
                                                     key={product.productId}
-                                                    className='border-b hover:bg-gray-50'
-                                                    style={{borderColor: theme.secondary}}
+                                                    className="border-b hover:bg-gray-50"
+                                                    style={{ borderColor: theme.secondary }}
                                                 >
-                                                    <td className='py-3 px-4'>
-                                                        <div className='w-12 h-12 min-h-12 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
+                                                    <td className="py-3 px-4">
+                                                        <div className="w-12 h-12 min-h-12 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
                                                             <CachedImage
                                                                 src={product.productImgUrl.replace('c_fill,w_3840', 'c_fill,w_48,h_48')}
                                                                 alt={product.productName}
                                                                 width={48}
                                                                 height={48}
                                                                 cacheKey={`product_img_${product.productId}`}
-                                                                className='w-full h-full object-cover'
-                                                                sizes='48px'
+                                                                className="w-full h-full object-cover"
+                                                                sizes="48px"
                                                             />
                                                         </div>
                                                     </td>
-                                                    <td className='py-3 px-4'>{product.productName}</td>
-                                                    <td className='py-3 px-4 hidden sm:table-cell'>
-                                                            <span
-                                                                className='px-2 py-1 rounded-full text-xs'
-                                                                style={{
-                                                                    backgroundColor: theme.secondary,
-                                                                    color: theme.text,
-                                                                }}
-                                                            >
-                                                                {product.categoryName}
-                                                            </span>
+                                                    <td className="py-3 px-4">{product.productName}</td>
+                                                    <td className="py-3 px-4 hidden sm:table-cell">
+                                                        <span
+                                                            className="px-2 py-1 rounded-full text-xs"
+                                                            style={{
+                                                                backgroundColor: theme.secondary,
+                                                                color: theme.text,
+                                                            }}
+                                                        >
+                                                            {product.categoryName}
+                                                        </span>
                                                     </td>
-                                                    <td className='py-3 px-4'>${product.price.toFixed(2)}</td>
-                                                    <td className='py-3 px-4'>
-                                                            <span
-                                                                className={`px-2 py-1 rounded-full text-xs ${
-                                                                    product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                                                }`}
-                                                            >
-                                                                {product.stock}
-                                                            </span>
+                                                    <td className="py-3 px-4">${product.price.toFixed(2)}</td>
+                                                    <td className="py-3 px-4">
+                                                        <span
+                                                            className={`px-2 py-1 rounded-full text-xs ${
+                                                                product.stock < 10 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                            }`}
+                                                        >
+                                                            {product.stock}
+                                                        </span>
                                                     </td>
-                                                    <td className='py-3 px-4'>
-                                                        <div className='flex space-x-2'>
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex space-x-2">
                                                             <Button
-                                                                variant='outline'
-                                                                size='sm'
+                                                                variant="outline"
+                                                                size="sm"
                                                                 onClick={() => openEditDialog(product)}
                                                                 style={{
                                                                     borderColor: theme.accent,
                                                                     color: theme.text,
                                                                 }}
                                                             >
-                                                                <Edit size={14}/>
+                                                                <Edit size={14} />
                                                             </Button>
                                                             <Button
-                                                                variant='outline'
-                                                                size='sm'
+                                                                variant="outline"
+                                                                size="sm"
                                                                 onClick={() => openDeleteDialog(product.productId)}
                                                                 style={{
                                                                     borderColor: '#EF4444',
                                                                     color: '#EF4444',
                                                                 }}
                                                             >
-                                                                <Trash2 size={14}/>
+                                                                <Trash2 size={14} />
                                                             </Button>
                                                         </div>
                                                     </td>
@@ -402,7 +400,7 @@ export default function ProductsPage() {
                             </CardContent>
                         </Card>
                         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} key="edit-dialog">
-                            <DialogContent className='sm:max-w-[600px]'>
+                            <DialogContent className="sm:max-w-[600px]">
                                 <DialogHeader>
                                     <DialogTitle>Edit Product</DialogTitle>
                                     <DialogDescription>
@@ -414,19 +412,17 @@ export default function ProductsPage() {
                                         onSubmitAction={handleUpdateProduct}
                                         initialData={editingProduct}
                                         isLoading={updateProductMutation.isPending}
-                                        categories={categories.filter(c => c !== 'All')}
+                                        categories={categories.filter((c) => c !== 'All')}
                                     />
                                 )}
                             </DialogContent>
                         </Dialog>
-                        {/* Delete Confirmation Dialog */}
                         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} key="delete-dialog">
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the product
-                                        and remove the data from the server.
+                                        This action cannot be undone. This will permanently delete the product and remove the data from the server.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

@@ -15,11 +15,12 @@ import {
     updateDoc,
     where,
 } from 'firebase/firestore';
-import {db} from '@/lib/firebase';
-import {ProductFormData, ProductType} from '@/lib/types/productType';
-import {FirebaseError} from '@firebase/util';
-import {useMutation, useQuery} from '@tanstack/react-query';
-import {useProductStore} from '@/lib/stores/productStore';
+import { db } from '@/lib/firebase';
+import { ProductFormData, ProductType } from '@/lib/types/productType';
+import { FirebaseError } from '@firebase/util';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useProductStore } from '@/lib/stores/productStore';
+import { keepPreviousData } from '@tanstack/react-query';
 
 interface AppError {
     message: string;
@@ -40,15 +41,15 @@ const handleError = (error: unknown): AppError => {
                         severity: 'error'
                     };
                 case 'firestore/not-found':
-                    return {message: 'The requested product was not found.', code: 'NOT_FOUND', severity: 'warning'};
+                    return { message: 'The requested product was not found.', code: 'NOT_FOUND', severity: 'warning' };
                 default:
-                    return {message: defaultMessage, code: (error as FirebaseError).code, severity: 'error'};
+                    return { message: defaultMessage, code: (error as FirebaseError).code, severity: 'error' };
             }
         }
-        return {message: error.message, severity: 'error'};
+        return { message: error.message, severity: 'error' };
     }
 
-    return {message: defaultMessage, severity: 'error'};
+    return { message: defaultMessage, severity: 'error' };
 };
 
 const uploadToCloudinary = async (file: File): Promise<{ url: string; publicId: string }> => {
@@ -88,7 +89,7 @@ const deleteFromCloudinary = async (publicId: string): Promise<void> => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({publicId}),
+            body: JSON.stringify({ publicId }),
         });
 
         if (!response.ok) {
@@ -116,7 +117,7 @@ interface ProductsPage {
 }
 
 export const useFetchProducts = (pageSize: number = 10, page: number = 1) => {
-    const {setLoading, setError} = useProductStore();
+    const { setLoading, setError } = useProductStore();
 
     return useQuery<ProductsPage, Error>({
         queryKey: ['products', page, pageSize],
@@ -124,7 +125,7 @@ export const useFetchProducts = (pageSize: number = 10, page: number = 1) => {
             setLoading(true);
             try {
                 const productsRef = collection(db, 'products');
-                const cacheKey = 'all';
+                const cacheKey = `all:${pageSize}`;
 
                 if (!paginationCache[cacheKey]) {
                     paginationCache[cacheKey] = {
@@ -141,43 +142,34 @@ export const useFetchProducts = (pageSize: number = 10, page: number = 1) => {
                 const totalCount = paginationCache[cacheKey].totalCount;
                 const totalPages = Math.ceil(totalCount / pageSize);
 
-                let q = query(productsRef, orderBy('createdAt', 'desc'));
+                let q = query(productsRef, orderBy('createdAt', 'desc'), limit(pageSize));
 
                 if (page > 1) {
                     const startDoc = paginationCache[cacheKey].pageDocuments.get(page - 1);
-
                     if (startDoc) {
-                        q = query(q, startAfter(startDoc), limit(pageSize));
+                        q = query(productsRef, orderBy('createdAt', 'desc'), startAfter(startDoc), limit(pageSize));
                     } else {
                         const prevPageDocs = await getDocs(
                             query(productsRef, orderBy('createdAt', 'desc'), limit((page - 1) * pageSize))
                         );
-
                         if (!prevPageDocs.empty) {
                             const lastVisible = prevPageDocs.docs[prevPageDocs.docs.length - 1];
-                            q = query(q, startAfter(lastVisible), limit(pageSize));
-                        } else {
-                            q = query(q, limit(pageSize));
+                            paginationCache[cacheKey].pageDocuments.set(page - 1, lastVisible);
+                            q = query(productsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(pageSize));
                         }
                     }
-                } else {
-                    q = query(q, limit(pageSize));
                 }
 
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
-                    paginationCache[cacheKey].pageDocuments.set(
-                        page,
-                        querySnapshot.docs[querySnapshot.docs.length - 1]
-                    );
+                    paginationCache[cacheKey].pageDocuments.set(page, querySnapshot.docs[querySnapshot.docs.length - 1]);
                 }
 
                 const productsData: ProductType[] = querySnapshot.docs.map((doc) => ({
                     ...(doc.data() as Omit<ProductType, 'productId'>),
                     productId: doc.id,
                 }));
-
 
                 return {
                     products: productsData,
@@ -194,11 +186,12 @@ export const useFetchProducts = (pageSize: number = 10, page: number = 1) => {
                 setLoading(false);
             }
         },
+        placeholderData: keepPreviousData,
     });
 };
 
 export const useAddProduct = () => {
-    const {setLoading, setError} = useProductStore();
+    const { setLoading, setError } = useProductStore();
 
     return useMutation<void, Error, ProductFormData>({
         mutationFn: async (productData: ProductFormData) => {
@@ -226,7 +219,7 @@ export const useAddProduct = () => {
 
                 Object.keys(paginationCache).forEach((key) => {
                     paginationCache[key].pageDocuments.clear();
-                    paginationCache[key].totalCount = 0;
+                    paginationCache[key].totalCount += 1;
                 });
             } catch (error) {
                 const appError = handleError(error);
@@ -240,10 +233,10 @@ export const useAddProduct = () => {
 };
 
 export const useUpdateProduct = () => {
-    const {setLoading, setError} = useProductStore();
+    const { setLoading, setError } = useProductStore();
 
     return useMutation<void, Error, { productId: string; productData: ProductFormData }>({
-        mutationFn: async ({productId, productData}) => {
+        mutationFn: async ({ productId, productData }) => {
             setLoading(true);
             try {
                 const productRef = doc(db, 'products', productId);
@@ -301,7 +294,7 @@ export const useUpdateProduct = () => {
 };
 
 export const useDeleteProduct = () => {
-    const {setLoading, setError} = useProductStore();
+    const { setLoading, setError } = useProductStore();
 
     return useMutation<void, Error, string>({
         mutationFn: async (productId) => {
@@ -329,7 +322,7 @@ export const useDeleteProduct = () => {
 
                 Object.keys(paginationCache).forEach((key) => {
                     paginationCache[key].pageDocuments.clear();
-                    paginationCache[key].totalCount -= 1;
+                    paginationCache[key].totalCount = Math.max(0, paginationCache[key].totalCount - 1);
                 });
             } catch (error) {
                 console.error('Error deleting product:', error);
@@ -344,14 +337,14 @@ export const useDeleteProduct = () => {
 };
 
 export const useSearchProducts = (searchTerm: string, category?: string, pageSize: number = 10, page: number = 1) => {
-    const {setLoading, setError} = useProductStore();
+    const { setLoading, setError } = useProductStore();
 
     return useQuery<ProductsPage, Error>({
         queryKey: ['products', 'search', searchTerm, category || 'all', page, pageSize],
         queryFn: async () => {
             setLoading(true);
             try {
-                const cacheKey = `search:${searchTerm}:${category || 'all'}`;
+                const cacheKey = `search:${searchTerm}:${category || 'all'}:${pageSize}`;
 
                 if (!paginationCache[cacheKey]) {
                     paginationCache[cacheKey] = {
@@ -361,14 +354,13 @@ export const useSearchProducts = (searchTerm: string, category?: string, pageSiz
                 }
 
                 const productsRef = collection(db, 'products');
-
                 let baseQuery = query(productsRef, orderBy('createdAt', 'desc'));
+
                 if (category && category !== 'All') {
-                    baseQuery = query(productsRef, where('categoryName', '==', category), orderBy('createdAt', 'desc'));
+                    baseQuery = query(baseQuery, where('categoryName', '==', category));
                 }
 
                 const querySnapshot = await getDocs(baseQuery);
-
 
                 let allProducts = querySnapshot.docs.map((doc) => ({
                     ...(doc.data() as Omit<ProductType, 'productId'>),
@@ -382,7 +374,6 @@ export const useSearchProducts = (searchTerm: string, category?: string, pageSiz
                             (product.description &&
                                 product.description.toLowerCase().includes(searchTerm.toLowerCase()))
                     );
-
                 }
 
                 const totalCount = allProducts.length;
@@ -391,6 +382,10 @@ export const useSearchProducts = (searchTerm: string, category?: string, pageSiz
                 const startIndex = (page - 1) * pageSize;
                 const endIndex = startIndex + pageSize;
                 const paginatedProducts = allProducts.slice(startIndex, endIndex);
+
+                if (allProducts.length > endIndex) {
+                    paginationCache[cacheKey].pageDocuments.set(page, querySnapshot.docs[endIndex - 1]);
+                }
 
                 return {
                     products: paginatedProducts,
@@ -407,6 +402,7 @@ export const useSearchProducts = (searchTerm: string, category?: string, pageSiz
                 setLoading(false);
             }
         },
-        enabled: true,
+        placeholderData: keepPreviousData,
+        enabled: !!searchTerm || !!category,
     });
 };

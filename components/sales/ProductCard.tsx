@@ -62,7 +62,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
     };
 
     return (
-        <Card className="flex flex-col h-full overflow-hidden p-0 transition-all hover:shadow-md">
+        <Card className="flex flex-col h-full overflow-hidden p-0 transition-all hover:shadow-md min-w-[150px] max-w-[250px] mx-auto">
             <div className="relative w-full h-40">
                 {product.productImgUrl ? (
                     <Image
@@ -70,7 +70,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                         alt={product.productName}
                         fill
                         className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                        sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 25vw"
+                        sizes="(max-width: 640px) 45vw, (max-width: 1024px) 25vw, 20vw"
                         priority={false}
                         loader={cloudinaryImageLoader}
                         onLoad={handleImageLoad}
@@ -107,13 +107,13 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                 )}
             </div>
 
-            <CardContent className="p-2 flex flex-col justify-between gap-1 flex-grow">
+            <CardContent className="p-3 flex flex-col justify-between gap-2 flex-grow">
                 <div>
                     <div className="flex justify-between items-start">
-                        <h3 className="text-xs sm:text-sm font-medium line-clamp-2 w-3/4" style={{ color: theme.text }}>
+                        <h3 className="text-sm font-medium line-clamp-2 w-3/4" style={{ color: theme.text }}>
                             {product.productName}
                         </h3>
-                        <p className="text-sm sm:text-base font-bold" style={{ color: theme.primary }}>
+                        <p className="text-sm font-bold" style={{ color: theme.primary }}>
                             {currencySymbol}{priceToDisplay.toFixed(2)}
                         </p>
                     </div>
@@ -123,16 +123,16 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                     </p>
                 </div>
 
-                <div className="flex items-center gap-1 mt-1 flex-wrap sm:flex-nowrap">
-                    <div className="flex items-center border rounded-md h-7">
+                <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center border rounded-md h-8">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-6 rounded-l-md border-r p-0"
+                            className="h-8 w-8 rounded-l-md border-r p-0"
                             onClick={handleDecrement}
                             disabled={quantity <= 1 || isOutOfStock}
                         >
-                            <Minus size={12} />
+                            <Minus size={14} />
                         </Button>
                         <Input
                             type="number"
@@ -140,22 +140,22 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                             max={product.stock}
                             value={quantity}
                             onChange={(e) => setQuantity(Math.min(Math.max(1, Number(e.target.value || 1)), product.stock))}
-                            className="w-7 text-center border-0 focus-visible:ring-0 no-spinner p-0 text-xs h-7"
+                            className="w-10 text-center border-0 focus-visible:ring-0 no-spinner p-0 text-sm h-8"
                             disabled={isOutOfStock}
                         />
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-6 rounded-r-md border-l p-0"
+                            className="h-8 w-8 rounded-r-md border-l p-0"
                             onClick={handleIncrement}
                             disabled={quantity >= product.stock || isOutOfStock}
                         >
-                            <Plus size={12} />
+                            <Plus size={14} />
                         </Button>
                     </div>
 
                     <Button
-                        className="flex-1 h-7 text-xs font-medium whitespace-nowrap"
+                        className="flex-1 h-8 text-sm font-medium"
                         style={{ backgroundColor: isOutOfStock ? 'gray' : theme.primary }}
                         onClick={() => {
                             if (quantity <= product.stock && !isOutOfStock) {
@@ -171,7 +171,7 @@ export default function ProductCard({ product, addToCartAction, currencySymbol =
                         }}
                         disabled={isOutOfStock}
                     >
-                        <Plus size={12} className="mr-1 flex-shrink-0"/> Add
+                        <Plus size={14} className="mr-1 flex-shrink-0"/> Add
                     </Button>
                 </div>
             </CardContent>

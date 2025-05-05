@@ -1,258 +1,99 @@
 'use client'
 
-import {useEffect, useState} from 'react'
-import {Book, CalendarIcon, Eye, FileText, Filter, RefreshCcw, Search, Trash2, X} from 'lucide-react'
-import {collection, getDocs, limit, orderBy, query, startAfter, Timestamp, where} from 'firebase/firestore'
-import {db} from '@/lib/firebase'
-import {theme} from '@/lib/colorPattern'
-import {Card, CardContent} from '@/components/ui/card'
-import {Button} from '@/components/ui/button'
-import {Input} from '@/components/ui/input'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Badge} from '@/components/ui/badge'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
-import {Calendar as CalendarComponent} from '@/components/ui/calendar'
-import {format} from 'date-fns'
-import {Customer} from "@/lib/stores/saleStore"
-import Pagination from '@/components/common/Pagination'
-import {Skeleton} from "@/components/ui/skeleton"
-import {SaleHistory} from "@/lib/types/saleType"
-import ReceiptModal from "@/components/ledger/ReceiptModal"
-import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from "@/components/ui/sheet"
-import {useRouter} from "next/navigation"
-import {useAuth} from '@/lib/stores/AuthContext'
-import DeleteSaleModal from '@/components/ledger/DeleteSaleModal'
-import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
-import {toast} from 'sonner'
-
+import { useEffect, useState, useMemo } from 'react';
+import { Book, CalendarIcon, Eye, FileText, Filter, Search, Trash2, X } from 'lucide-react';
+import { theme } from '@/lib/colorPattern';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import Pagination from '@/components/common/Pagination';
+import { Skeleton } from '@/components/ui/skeleton';
+import ReceiptModal from '@/components/ledger/ReceiptModal';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/stores/AuthContext';
+import DeleteSaleModal from '@/components/ledger/DeleteSaleModal';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { SaleHistory, SaleFilter } from '@/lib/types/saleType';
+import { useSalesData } from '@/lib/hooks/useSaleData';
 
 export default function LedgerPage() {
-    const [sales, setSales] = useState<SaleHistory[]>([])
-    const [customers, setCustomers] = useState<Record<string, Customer>>({})
-    const [loading, setLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('')
-    const [selectedSale, setSelectedSale] = useState<SaleHistory | null>(null)
-    const [saleToDelete, setSaleToDelete] = useState<SaleHistory | null>(null)
-    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
-    const [paymentFilter, setPaymentFilter] = useState<string>('all')
-    const [currencyFilter, setCurrencyFilter] = useState<string>('all')
-    const [dateFilter, setDateFilter] = useState<Date | null>(null)
-    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
-    const [filterSheetOpen, setFilterSheetOpen] = useState(false)
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(10)
-    const [totalItems, setTotalItems] = useState(0)
-    const [totalPages, setTotalPages] = useState(1)
-    const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([])
-    const [activeFilters, setActiveFilters] = useState(0)
-    const router = useRouter()
-    const {userWithRole} = useAuth()
-    const isAdmin = userWithRole?.role === 'admin'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSale, setSelectedSale] = useState<SaleHistory | null>(null);
+    const [saleToDelete, setSaleToDelete] = useState<SaleHistory | null>(null);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [paymentFilter, setPaymentFilter] = useState<string>('all');
+    const [currencyFilter, setCurrencyFilter] = useState<string>('all');
+    const [dateFilter, setDateFilter] = useState<Date | null>(null);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [activeFilters, setActiveFilters] = useState(0);
+    const router = useRouter();
+    const { userWithRole } = useAuth();
+    const isAdmin = userWithRole?.role === 'admin';
+
+    const filters: SaleFilter = useMemo(
+        () => ({
+            searchQuery,
+            paymentFilter,
+            currencyFilter,
+            dateFilter
+        }),
+        [searchQuery, paymentFilter, currencyFilter, dateFilter]
+    );
+
+    const {
+        sales,
+        customers,
+        loading,
+        pagination,
+        availableCurrencies,
+        fetchPageData,
+        setItemsPerPage: setItemsPerPageInHook,
+        refreshData
+    } = useSalesData(filters);
 
     useEffect(() => {
-        const fetchCustomers = async () => {
-            try {
-                const customersQuery = query(collection(db, 'customers'))
-                const customersSnapshot = await getDocs(customersQuery)
-                const customersMap: Record<string, Customer> = {}
-
-                customersSnapshot.docs.forEach(doc => {
-                    const customerData = doc.data() as Omit<Customer, 'id'>
-                    customersMap[customerData.customerId] = {
-                        id: doc.id,
-                        ...customerData
-                    }
-                })
-                setCustomers(customersMap)
-            } catch (error) {
-                console.error('Error fetching customers data:', error)
-            }
-        }
-
-        fetchCustomers()
-    }, [])
-
-    useEffect(() => {
-        const fetchSales = async () => {
-            try {
-                setLoading(true)
-
-                const salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
-                    limit(itemsPerPage)
-                )
-
-                const countQuery = query(collection(db, 'sales'))
-                const countSnapshot = await getDocs(countQuery)
-                const total = countSnapshot.size
-                setTotalItems(total)
-                setTotalPages(Math.ceil(total / itemsPerPage))
-
-                const salesSnapshot = await getDocs(salesQuery)
-
-                const currencies = new Set<string>()
-
-                const salesData = salesSnapshot.docs.map(doc => {
-                    const data = doc.data() as SaleHistory;
-
-                    if (data.currency) {
-                        currencies.add(data.currency)
-                    }
-
-                    return {
-                        id: doc.id,
-                        saleId: data.saleId,
-                        customerId: data.customerId,
-                        products: data.products,
-                        totalAmount: data.totalAmount,
-                        totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
-                        paymentMethod: data.paymentMethod,
-                        currency: data.currency || 'USD',
-                        exchangeRate: data.exchangeRate || 1,
-                        saleDate: data.saleDate,
-                        customerName: customers[data.customerId]?.name || 'Unknown'
-                    };
-                });
-
-                setAvailableCurrencies(Array.from(currencies))
-                setSales(salesData)
-            } catch (error) {
-                console.error('Error fetching sales data:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchSales()
-    }, [customers, dateFilter, itemsPerPage, currentPage])
-
-    useEffect(() => {
-        let count = 0
-        if (paymentFilter !== 'all') count++
-        if (currencyFilter !== 'all') count++
-        if (dateFilter !== null) count++
-        setActiveFilters(count)
-    }, [paymentFilter, currencyFilter, dateFilter])
+        let count = 0;
+        if (paymentFilter !== 'all') count++;
+        if (currencyFilter !== 'all') count++;
+        if (dateFilter !== null) count++;
+        setActiveFilters(count);
+    }, [paymentFilter, currencyFilter, dateFilter]);
 
     const handlePageChange = async (page: number) => {
-        try {
-            setLoading(true)
-            setCurrentPage(page)
-
-            const skipItems = (page - 1) * itemsPerPage
-
-            let salesQuery;
-
-            if (page === 1) {
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
-                    limit(itemsPerPage)
-                )
-            } else {
-                const previousPageQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
-                    limit(skipItems)
-                )
-                const previousPageSnapshot = await getDocs(previousPageQuery)
-                const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1]
-
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    orderBy('saleDate', 'desc'),
-                    startAfter(lastVisible),
-                    limit(itemsPerPage)
-                )
-            }
-
-            if (dateFilter) {
-                const startOfDay = new Date(dateFilter)
-                startOfDay.setHours(0, 0, 0, 0)
-
-                const endOfDay = new Date(dateFilter)
-                endOfDay.setHours(23, 59, 59, 999)
-
-                salesQuery = query(
-                    collection(db, 'sales'),
-                    where('saleDate', '>=', Timestamp.fromDate(startOfDay)),
-                    where('saleDate', '<=', Timestamp.fromDate(endOfDay)),
-                    orderBy('saleDate', 'desc'),
-                    limit(itemsPerPage)
-                )
-            }
-
-            const salesSnapshot = await getDocs(salesQuery)
-
-            const salesData = salesSnapshot.docs.map(doc => {
-                const data = doc.data() as SaleHistory;
-
-                return {
-                    id: doc.id,
-                    saleId: data.saleId,
-                    customerId: data.customerId,
-                    products: data.products,
-                    totalAmount: data.totalAmount,
-                    totalAmountInSelectedCurrency: data.totalAmountInSelectedCurrency,
-                    paymentMethod: data.paymentMethod,
-                    currency: data.currency || 'USD',
-                    exchangeRate: data.exchangeRate || 1,
-                    saleDate: data.saleDate,
-                    customerName: customers[data.customerId]?.name || 'Unknown'
-                };
-            });
-
-            setSales(salesData)
-        } catch (error) {
-            console.error('Error changing page:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
+        await fetchPageData(page);
+    };
 
     const handleItemsPerPageChange = (value: string) => {
-        const newItemsPerPage = parseInt(value)
-        setItemsPerPage(newItemsPerPage)
-        setCurrentPage(1)
-        setTotalPages(Math.ceil(totalItems / newItemsPerPage))
-    }
+        const newItemsPerPage = parseInt(value);
+        setItemsPerPage(newItemsPerPage);
+        setItemsPerPageInHook(newItemsPerPage);
+    };
 
     const handleDeleteSuccess = async () => {
-        await handlePageChange(currentPage)
-        toast.success('Sale deleted successfully')
-    }
+        await refreshData();
+        toast.success('Sale deleted successfully');
+    };
 
     const handleConfirmDelete = () => {
-        setConfirmDeleteOpen(false)
-        setSaleToDelete(saleToDelete)
-    }
-
+        setConfirmDeleteOpen(false);
+    };
     const handleOpenConfirmDelete = (sale: SaleHistory) => {
-        setSaleToDelete(sale)
-        setConfirmDeleteOpen(true)
-    }
-
-    const filteredSales = sales.filter(sale => {
-        const searchLower = searchQuery.toLowerCase()
-        const matchesSearch = sale.saleId.toLowerCase().includes(searchLower) ||
-            sale.customerName?.toLowerCase().includes(searchLower) ||
-            sale.products.some(p => p.productName?.toLowerCase().includes(searchLower))
-
-        const matchesPayment = paymentFilter === 'all' || sale.paymentMethod === paymentFilter
-
-        const matchesCurrency = currencyFilter === 'all' || sale.currency === currencyFilter
-
-        const matchesDate = !dateFilter ||
-            (dateFilter && format(sale.saleDate.toDate(), 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd'))
-
-        return matchesSearch && matchesPayment && matchesCurrency && matchesDate
-    })
-
+        setSaleToDelete(sale);
+        setConfirmDeleteOpen(true);
+    };
     const formatPaymentMethod = (method: string) => {
-        return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')
-    }
+        return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ');
+    };
 
     const handleViewSale = (sale: SaleHistory) => {
         setSelectedSale(sale);
@@ -265,61 +106,74 @@ export default function LedgerPage() {
     };
 
     const clearAllFilters = () => {
-        setSearchQuery('')
-        setPaymentFilter('all')
-        setCurrencyFilter('all')
-        setDateFilter(null)
-        setFilterSheetOpen(false)
-    }
+        setSearchQuery('');
+        setPaymentFilter('all');
+        setCurrencyFilter('all');
+        setDateFilter(null);
+        setFilterSheetOpen(false);
+    };
 
     const getPaymentBadgeStyle = (method: string) => {
         switch (method) {
             case 'cash':
-                return {backgroundColor: '#4CAF50', color: 'white'}
+                return { backgroundColor: '#4CAF50', color: 'white' };
             case 'card':
-                return {backgroundColor: '#2196F3', color: 'white'}
+                return { backgroundColor: '#2196F3', color: 'white' };
             case 'aba':
-                return {backgroundColor: '#0047AB', color: 'white'}
+                return { backgroundColor: '#0047AB', color: 'white' };
             case 'acleda':
-                return {backgroundColor: '#3F00FF', color: 'white'}
+                return { backgroundColor: '#3F00FF', color: 'white' };
             case 'bank_transfer':
-                return {backgroundColor: '#9C27B0', color: 'white'}
+                return { backgroundColor: '#9C27B0', color: 'white' };
             default:
-                return {backgroundColor: theme.secondary, color: theme.text}
+                return { backgroundColor: theme.secondary, color: theme.text };
         }
-    }
+    };
 
     const getCurrencyBadgeStyle = (currency: string) => {
         switch (currency) {
             case 'USD':
-                return {backgroundColor: '#4CAF50', color: 'white'}
+                return { backgroundColor: '#4CAF50', color: 'white' };
             case 'THB':
-                return {backgroundColor: '#FF9800', color: 'white'}
+                return { backgroundColor: '#FF9800', color: 'white' };
             case 'KHR':
-                return {backgroundColor: '#9C27B0', color: 'white'}
+                return { backgroundColor: '#9C27B0', color: 'white' };
             default:
-                return {backgroundColor: '#607D8B', color: 'white'}
+                return { backgroundColor: '#607D8B', color: 'white' };
         }
-    }
+    };
 
     const handleDateSelect = (day: Date | undefined) => {
-        setDateFilter(day || null)
-        setCurrentPage(1)
-    }
+        setDateFilter(day || null);
+    };
 
     const renderSkeletons = () => {
-        return Array.from({length: itemsPerPage}).map((_, index) => (
+        return Array.from({ length: itemsPerPage }).map((_, index) => (
             <TableRow key={`skeleton-${index}`}>
-                <TableCell><Skeleton className="h-5 w-20"/></TableCell>
-                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-32"/></TableCell>
-                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-16"/></TableCell>
-                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-20"/></TableCell>
-                <TableCell><Skeleton className="h-5 w-24"/></TableCell>
-                <TableCell><Skeleton className="h-8 w-8 rounded-full"/></TableCell>
+                <TableCell>
+                    <Skeleton className="h-5 w-20" />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-5 w-32" />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell>
+                    <Skeleton className="h-5 w-16" />
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-5 w-20" />
+                </TableCell>
+                <TableCell>
+                    <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell>
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                </TableCell>
             </TableRow>
-        ))
-    }
+        ));
+    };
 
     const renderMobileCard = (sale: SaleHistory) => (
         <div key={sale.saleId} className="p-4 border-b last:border-b-0">
@@ -330,19 +184,21 @@ export default function LedgerPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleViewSale(sale)}
-                        style={{color: theme.primary}}
+                        style={{ color: theme.primary }}
                     >
-                        <Eye size={16}/>
+                        <Eye size={16} />
                     </Button>
-                    {isAdmin && <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
-                        className="text-red-500"
-                        disabled={!isAdmin}
-                    >
-                        <Trash2 size={16}/>
-                    </Button>}
+                    {isAdmin && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => isAdmin && handleOpenConfirmDelete(sale)}
+                            className="text-red-500"
+                            disabled={!isAdmin}
+                        >
+                            <Trash2 size={16} />
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -351,11 +207,14 @@ export default function LedgerPage() {
                 <span>{sale.customerName}</span>
 
                 <span className="text-gray-500">Items:</span>
-                <span>{sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}</span>
+                <span>
+                    {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
+                </span>
 
                 <span className="text-gray-500">Total:</span>
-                <span className="font-medium"
-                      style={{color: theme.primary}}>${Number(sale.totalAmount).toFixed(2)}</span>
+                <span className="font-medium" style={{ color: theme.primary }}>
+                    ${Number(sale.totalAmount).toFixed(2)}
+                </span>
 
                 <span className="text-gray-500">Payment:</span>
                 <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -363,32 +222,34 @@ export default function LedgerPage() {
                 </Badge>
 
                 <span className="text-gray-500">Currency:</span>
-                <Badge style={getCurrencyBadgeStyle(sale.currency)}>
-                    {sale.currency}
-                </Badge>
+                <Badge style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
             </div>
         </div>
-    )
+    );
 
     return (
         <div className="flex flex-col h-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6">
                 <div className="flex items-center mb-4 md:mb-0">
-                    <Book style={{color: theme.primary}}/>
-                    <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
+                    <Book style={{ color: theme.primary }} />
+                    <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{ color: theme.primary }}>
                         Sale Ledger
                     </h1>
-                    <Button className="ml-4 h-10 px-4" style={{
-                        backgroundColor: '#FF4B6A',
-                        color: 'white',
-                        cursor: 'pointer'
-                    }} onClick={() => router.push('/ledger/service-ledger')}>
+                    <Button
+                        className="ml-4 h-10 px-4"
+                        style={{
+                            backgroundColor: '#FF4B6A',
+                            color: 'white',
+                            cursor: 'pointer'
+                        }}
+                        onClick={() => router.push('/ledger/service-ledger')}
+                    >
                         Services
                     </Button>
                 </div>
                 <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="relative flex-grow md:flex-grow-0">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
+                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
                         <Input
                             placeholder="Search sales..."
                             value={searchQuery}
@@ -397,12 +258,9 @@ export default function LedgerPage() {
                         />
                     </div>
 
-                    <Select
-                        value={paymentFilter}
-                        onValueChange={setPaymentFilter}
-                    >
+                    <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                         <SelectTrigger className="h-10 w-full md:w-40">
-                            <SelectValue placeholder="Payment"/>
+                            <SelectValue placeholder="Payment" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Payments</SelectItem>
@@ -434,9 +292,9 @@ export default function LedgerPage() {
                             <Button
                                 variant="outline"
                                 className="h-10 flex gap-2"
-                                style={{borderColor: dateFilter ? theme.primary : undefined}}
+                                style={{ borderColor: dateFilter ? theme.primary : undefined }}
                             >
-                                <CalendarIcon size={16}/>
+                                <CalendarIcon size={16} />
                                 {dateFilter ? format(dateFilter, 'MMM dd, yyyy') : 'Filter by date'}
                             </Button>
                         </PopoverTrigger>
@@ -448,11 +306,7 @@ export default function LedgerPage() {
                             />
                             {dateFilter && (
                                 <div className="p-2 border-t flex justify-end">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setDateFilter(null)}
-                                    >
+                                    <Button variant="ghost" size="sm" onClick={() => setDateFilter(null)}>
                                         Clear
                                     </Button>
                                 </div>
@@ -463,7 +317,7 @@ export default function LedgerPage() {
 
                 <div className="flex gap-2 w-full md:hidden">
                     <div className="relative flex-grow">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
+                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
                         <Input
                             placeholder="Search sales..."
                             value={searchQuery}
@@ -478,12 +332,11 @@ export default function LedgerPage() {
                                 variant="outline"
                                 size="icon"
                                 className="relative"
-                                style={activeFilters > 0 ? {borderColor: theme.primary} : {}}
+                                style={activeFilters > 0 ? { borderColor: theme.primary } : {}}
                             >
-                                <Filter size={18}/>
+                                <Filter size={18} />
                                 {activeFilters > 0 && (
-                                    <span
-                                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
                                         {activeFilters}
                                     </span>
                                 )}
@@ -500,15 +353,9 @@ export default function LedgerPage() {
                                     <div className="flex flex-col gap-4">
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Payment Method</label>
-                                            <Select
-                                                value={paymentFilter}
-                                                onValueChange={(value) => {
-                                                    setPaymentFilter(value);
-                                                    setCurrentPage(1);
-                                                }}
-                                            >
+                                            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                                                 <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Payment method"/>
+                                                    <SelectValue placeholder="Payment method" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="all">All Payments</SelectItem>
@@ -521,21 +368,16 @@ export default function LedgerPage() {
 
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Currency</label>
-                                            <Select
-                                                value={currencyFilter}
-                                                onValueChange={(value) => {
-                                                    setCurrencyFilter(value);
-                                                    setCurrentPage(1);
-                                                }}
-                                            >
+                                            <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
                                                 <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Currency"/>
+                                                    <SelectValue placeholder="Currency" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="all">All Currencies</SelectItem>
-                                                    {availableCurrencies.map(currency => (
-                                                        <SelectItem key={currency}
-                                                                    value={currency}>{currency}</SelectItem>
+                                                    {availableCurrencies.map((currency) => (
+                                                        <SelectItem key={currency} value={currency}>
+                                                            {currency}
+                                                        </SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -561,7 +403,7 @@ export default function LedgerPage() {
                                                         onClick={() => setDateFilter(null)}
                                                         className="text-xs"
                                                     >
-                                                        <X size={14} className="mr-1"/> Clear date
+                                                        <X size={14} className="mr-1" /> Clear date
                                                     </Button>
                                                 </div>
                                             )}
@@ -571,16 +413,12 @@ export default function LedgerPage() {
 
                                 <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t">
                                     <div className="flex gap-2 max-w-md mx-auto">
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1"
-                                            onClick={clearAllFilters}
-                                        >
+                                        <Button variant="outline" className="flex-1" onClick={clearAllFilters}>
                                             Clear All
                                         </Button>
                                         <Button
                                             className="flex-1"
-                                            style={{backgroundColor: theme.primary}}
+                                            style={{ backgroundColor: theme.primary, color: 'white' }}
                                             onClick={() => setFilterSheetOpen(false)}
                                         >
                                             Apply Filters
@@ -593,6 +431,7 @@ export default function LedgerPage() {
                 </div>
             </div>
 
+            {/* Active filters display for mobile */}
             {activeFilters > 0 && (
                 <div className="md:hidden flex flex-wrap gap-2 mb-4">
                     {paymentFilter !== 'all' && (
@@ -649,13 +488,13 @@ export default function LedgerPage() {
                                 </TableBody>
                             </Table>
                         </div>
-                    ) : filteredSales.length === 0 ? (
+                    ) : sales.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
-                            <FileText size={48} className="mb-4 opacity-30"/>
-                            <p className="text-lg font-medium" style={{color: theme.text}}>
+                            <FileText size={48} className="mb-4 opacity-30" />
+                            <p className="text-lg font-medium" style={{ color: theme.text }}>
                                 No sales found
                             </p>
-                            <p className="text-sm text-center px-4" style={{color: theme.text}}>
+                            <p className="text-sm text-center px-4" style={{ color: theme.text }}>
                                 {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
                                     : 'Create your first sale to see it here'}
@@ -668,6 +507,7 @@ export default function LedgerPage() {
                         </div>
                     ) : (
                         <>
+                            {/* Desktop Table View */}
                             <div className="hidden md:block overflow-x-auto h-full">
                                 <Table>
                                     <TableHeader>
@@ -682,19 +522,20 @@ export default function LedgerPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredSales.map(sale => (
+                                        {sales.map((sale) => (
                                             <TableRow key={sale.saleId}>
                                                 <TableCell className="font-medium">{sale.saleId}</TableCell>
                                                 <TableCell>{sale.customerName}</TableCell>
                                                 <TableCell>
                                                     {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
                                                 </TableCell>
-                                                <TableCell className="font-medium" style={{color: theme.primary}}>
+                                                <TableCell className="font-medium" style={{ color: theme.primary }}>
                                                     ${Number(sale.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge
-                                                        style={getCurrencyBadgeStyle(sale.currency)}>{sale.currency}</Badge>
+                                                    <Badge style={getCurrencyBadgeStyle(sale.currency)}>
+                                                        {sale.currency}
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge style={getPaymentBadgeStyle(sale.paymentMethod)}>
@@ -708,7 +549,7 @@ export default function LedgerPage() {
                                                             size="icon"
                                                             onClick={() => handleViewSale(sale)}
                                                         >
-                                                            <Eye size={20}/>
+                                                            <Eye size={20} />
                                                         </Button>
                                                         {isAdmin && (
                                                             <Button
@@ -716,8 +557,9 @@ export default function LedgerPage() {
                                                                 size="icon"
                                                                 onClick={() => handleOpenConfirmDelete(sale)}
                                                                 className="text-red-500"
+                                                                disabled={!isAdmin}
                                                             >
-                                                                <Trash2 size={20}/>
+                                                                <Trash2 size={20} />
                                                             </Button>
                                                         )}
                                                     </div>
@@ -728,18 +570,20 @@ export default function LedgerPage() {
                                 </Table>
                             </div>
 
+                            {/* Mobile Card View */}
                             <div className="md:hidden max-h-[calc(100vh-300px)] overflow-y-auto">
-                                {filteredSales.map(sale => renderMobileCard(sale))}
+                                {sales.map((sale) => renderMobileCard(sale))}
                             </div>
                         </>
                     )}
                 </CardContent>
             </Card>
+
             <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={totalItems}
-                itemsPerPage={itemsPerPage}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                itemsPerPage={pagination.itemsPerPage}
                 onPageChangeAction={handlePageChange}
                 onItemsPerPageChangeAction={handleItemsPerPageChange}
                 itemName="sales"
@@ -750,42 +594,48 @@ export default function LedgerPage() {
                 onClose={handleCloseReceiptModal}
                 transactionData={selectedSale}
                 customers={customers}
-                transactionType={'sale'}
+                transactionType="sale"
             />
 
             <Dialog open={confirmDeleteOpen} onOpenChange={(open) => !open && setConfirmDeleteOpen(false)}>
-                <DialogContent className="[&>button]:hidden"
-                               onEscapeKeyDown={(e) => e.preventDefault()}
-                               onPointerDownOutside={(e) => e.preventDefault()}>
+                <DialogContent
+                    className="[&>button]:hidden"
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                >
                     <DialogHeader>
-                        <DialogTitle style={{color: theme.primary}}>Confirm Deletion</DialogTitle>
+                        <DialogTitle style={{ color: theme.primary }}>Confirm Deletion</DialogTitle>
                         <DialogDescription>
                             Are you sure you want to delete this sale? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     {saleToDelete && (
                         <div className="py-4">
-                            <div className="p-3 rounded-md" style={{backgroundColor: theme.light}}>
-                                <p className="font-medium" style={{color: theme.text}}>
+                            <div className="p-3 rounded-md" style={{ backgroundColor: theme.light }}>
+                                <p className="font-medium" style={{ color: theme.text }}>
                                     {saleToDelete.saleId}
                                 </p>
-                                <p className="text-sm" style={{color: theme.text}}>
+                                <p className="text-sm" style={{ color: theme.text }}>
                                     Customer: {saleToDelete.customerName}
                                 </p>
-                                <p className="text-sm" style={{color: theme.text}}>
-                                    Items: {saleToDelete.products.length} {saleToDelete.products.length === 1 ? 'item' : 'items'}
+                                <p className="text-sm" style={{ color: theme.text }}>
+                                    Items: {saleToDelete.products.length}{' '}
+                                    {saleToDelete.products.length === 1 ? 'item' : 'items'}
                                 </p>
-                                <p className="text-sm" style={{color: theme.text}}>
+                                <p className="text-sm" style={{ color: theme.text }}>
                                     Total: ${Number(saleToDelete.totalAmount).toFixed(2)}
                                 </p>
                             </div>
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                            setConfirmDeleteOpen(false);
-                            setSaleToDelete(null);
-                        }}>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setConfirmDeleteOpen(false);
+                                setSaleToDelete(null);
+                            }}
+                        >
                             Cancel
                         </Button>
                         <Button
@@ -793,17 +643,8 @@ export default function LedgerPage() {
                             onClick={handleConfirmDelete}
                             disabled={loading || !isAdmin}
                         >
-                            {loading ? (
-                                <>
-                                    <RefreshCcw size={16} className="mr-2 animate-spin"/>
-                                    Processing...
-                                </>
-                            ) : (
-                                <>
-                                    <Trash2 size={16} className="mr-2"/>
-                                    Proceed to Delete
-                                </>
-                            )}
+                            <Trash2 size={16} className="mr-2" />
+                            Proceed to Delete
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -816,5 +657,5 @@ export default function LedgerPage() {
                 onSuccess={handleDeleteSuccess}
             />
         </div>
-    )
+    );
 }

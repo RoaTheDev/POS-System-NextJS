@@ -17,3 +17,16 @@ export interface ServiceHistory {
     transactionDate: Timestamp;
     customerName?: string;
 }
+export interface ServiceFilter {
+    searchQuery: string;
+    paymentFilter: string;
+    currencyFilter: string;
+    dateFilter: Date | null;
+}
+
+export interface ServicePagination {
+    currentPage: number;
+    itemsPerPage: number;
+    totalItems: number;
+    totalPages: number;
+}
