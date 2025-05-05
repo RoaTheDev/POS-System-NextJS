@@ -355,13 +355,15 @@ export default function ServiceLedgerPage() {
                             <div>
                                 <label className="text-sm font-medium mb-1 block">Payment Method</label>
                                 <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Payment method" />
+                                    <SelectTrigger className="h-10 w-full md:w-40">
+                                        <SelectValue placeholder="Payment" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Payments</SelectItem>
                                         <SelectItem value="cash">Cash</SelectItem>
                                         <SelectItem value="card">Card</SelectItem>
+                                        <SelectItem value="aba">ABA</SelectItem>
+                                        <SelectItem value="acleda">Acleda</SelectItem>
                                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -369,17 +371,18 @@ export default function ServiceLedgerPage() {
 
                             <div>
                                 <label className="text-sm font-medium mb-1 block">Currency</label>
-                                <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Currency" />
+                                <Select
+                                    value={currencyFilter}
+                                    onValueChange={setCurrencyFilter}
+                                >
+                                    <SelectTrigger className="h-10 w-full md:w-40">
+                                        <SelectValue placeholder="Currency"/>
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Currencies</SelectItem>
-                                        {availableCurrencies.map((currency) => (
-                                            <SelectItem key={currency} value={currency}>
-                                                {currency}
-                                            </SelectItem>
-                                        ))}
+                                        <SelectItem value="USD">USD ($)</SelectItem>
+                                        <SelectItem value="THB">Thai Baht (฿)</SelectItem>
+                                        <SelectItem value="KHR">Khmer Riel (៛)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

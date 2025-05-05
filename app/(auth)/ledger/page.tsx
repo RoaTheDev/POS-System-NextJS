@@ -1,28 +1,35 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react';
-import { Book, CalendarIcon, Eye, FileText, Filter, Search, Trash2, X } from 'lucide-react';
-import { theme } from '@/lib/colorPattern';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import {useEffect, useMemo, useState} from 'react';
+import {Book, CalendarIcon, Eye, FileText, Filter, Search, Trash2, X} from 'lucide-react';
+import {theme} from '@/lib/colorPattern';
+import {Card, CardContent} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table';
+import {Badge} from '@/components/ui/badge';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {Calendar as CalendarComponent} from '@/components/ui/calendar';
+import {format} from 'date-fns';
 import Pagination from '@/components/common/Pagination';
-import { Skeleton } from '@/components/ui/skeleton';
+import {Skeleton} from '@/components/ui/skeleton';
 import ReceiptModal from '@/components/ledger/ReceiptModal';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/stores/AuthContext';
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger} from '@/components/ui/sheet';
+import {useRouter} from 'next/navigation';
+import {useAuth} from '@/lib/stores/AuthContext';
 import DeleteSaleModal from '@/components/ledger/DeleteSaleModal';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { SaleHistory, SaleFilter } from '@/lib/types/saleType';
-import { useSalesData } from '@/lib/hooks/useSaleData';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from '@/components/ui/dialog';
+import {toast} from 'sonner';
+import {SaleFilter, SaleHistory} from '@/lib/types/saleType';
+import {useSalesData} from '@/lib/hooks/useSaleData';
 
 export default function LedgerPage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -37,7 +44,7 @@ export default function LedgerPage() {
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [activeFilters, setActiveFilters] = useState(0);
     const router = useRouter();
-    const { userWithRole } = useAuth();
+    const {userWithRole} = useAuth();
     const isAdmin = userWithRole?.role === 'admin';
 
     const filters: SaleFilter = useMemo(
@@ -55,7 +62,6 @@ export default function LedgerPage() {
         customers,
         loading,
         pagination,
-        availableCurrencies,
         fetchPageData,
         setItemsPerPage: setItemsPerPageInHook,
         refreshData
@@ -116,30 +122,30 @@ export default function LedgerPage() {
     const getPaymentBadgeStyle = (method: string) => {
         switch (method) {
             case 'cash':
-                return { backgroundColor: '#4CAF50', color: 'white' };
+                return {backgroundColor: '#4CAF50', color: 'white'};
             case 'card':
-                return { backgroundColor: '#2196F3', color: 'white' };
+                return {backgroundColor: '#2196F3', color: 'white'};
             case 'aba':
-                return { backgroundColor: '#0047AB', color: 'white' };
+                return {backgroundColor: '#0047AB', color: 'white'};
             case 'acleda':
-                return { backgroundColor: '#3F00FF', color: 'white' };
+                return {backgroundColor: '#3F00FF', color: 'white'};
             case 'bank_transfer':
-                return { backgroundColor: '#9C27B0', color: 'white' };
+                return {backgroundColor: '#9C27B0', color: 'white'};
             default:
-                return { backgroundColor: theme.secondary, color: theme.text };
+                return {backgroundColor: theme.secondary, color: theme.text};
         }
     };
 
     const getCurrencyBadgeStyle = (currency: string) => {
         switch (currency) {
             case 'USD':
-                return { backgroundColor: '#4CAF50', color: 'white' };
+                return {backgroundColor: '#4CAF50', color: 'white'};
             case 'THB':
-                return { backgroundColor: '#FF9800', color: 'white' };
+                return {backgroundColor: '#FF9800', color: 'white'};
             case 'KHR':
-                return { backgroundColor: '#9C27B0', color: 'white' };
+                return {backgroundColor: '#9C27B0', color: 'white'};
             default:
-                return { backgroundColor: '#607D8B', color: 'white' };
+                return {backgroundColor: '#607D8B', color: 'white'};
         }
     };
 
@@ -148,28 +154,28 @@ export default function LedgerPage() {
     };
 
     const renderSkeletons = () => {
-        return Array.from({ length: itemsPerPage }).map((_, index) => (
+        return Array.from({length: itemsPerPage}).map((_, index) => (
             <TableRow key={`skeleton-${index}`}>
                 <TableCell>
-                    <Skeleton className="h-5 w-20" />
+                    <Skeleton className="h-5 w-20"/>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-32"/>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-24"/>
                 </TableCell>
                 <TableCell>
-                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16"/>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                    <Skeleton className="h-5 w-20" />
+                    <Skeleton className="h-5 w-20"/>
                 </TableCell>
                 <TableCell>
-                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-24"/>
                 </TableCell>
                 <TableCell>
-                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <Skeleton className="h-8 w-8 rounded-full"/>
                 </TableCell>
             </TableRow>
         ));
@@ -184,9 +190,9 @@ export default function LedgerPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleViewSale(sale)}
-                        style={{ color: theme.primary }}
+                        style={{color: theme.primary}}
                     >
-                        <Eye size={16} />
+                        <Eye size={16}/>
                     </Button>
                     {isAdmin && (
                         <Button
@@ -196,7 +202,7 @@ export default function LedgerPage() {
                             className="text-red-500"
                             disabled={!isAdmin}
                         >
-                            <Trash2 size={16} />
+                            <Trash2 size={16}/>
                         </Button>
                     )}
                 </div>
@@ -212,7 +218,7 @@ export default function LedgerPage() {
                 </span>
 
                 <span className="text-gray-500">Total:</span>
-                <span className="font-medium" style={{ color: theme.primary }}>
+                <span className="font-medium" style={{color: theme.primary}}>
                     ${Number(sale.totalAmount).toFixed(2)}
                 </span>
 
@@ -231,8 +237,8 @@ export default function LedgerPage() {
         <div className="flex flex-col h-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6">
                 <div className="flex items-center mb-4 md:mb-0">
-                    <Book style={{ color: theme.primary }} />
-                    <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{ color: theme.primary }}>
+                    <Book style={{color: theme.primary}}/>
+                    <h1 className="ml-2 text-xl md:text-2xl font-bold" style={{color: theme.primary}}>
                         Sale Ledger
                     </h1>
                     <Button
@@ -249,7 +255,7 @@ export default function LedgerPage() {
                 </div>
                 <div className="hidden md:flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="relative flex-grow md:flex-grow-0">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+                        <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
                         <Input
                             placeholder="Search sales..."
                             value={searchQuery}
@@ -260,7 +266,7 @@ export default function LedgerPage() {
 
                     <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                         <SelectTrigger className="h-10 w-full md:w-40">
-                            <SelectValue placeholder="Payment" />
+                            <SelectValue placeholder="Payment"/>
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Payments</SelectItem>
@@ -292,9 +298,9 @@ export default function LedgerPage() {
                             <Button
                                 variant="outline"
                                 className="h-10 flex gap-2"
-                                style={{ borderColor: dateFilter ? theme.primary : undefined }}
+                                style={{borderColor: dateFilter ? theme.primary : undefined}}
                             >
-                                <CalendarIcon size={16} />
+                                <CalendarIcon size={16}/>
                                 {dateFilter ? format(dateFilter, 'MMM dd, yyyy') : 'Filter by date'}
                             </Button>
                         </PopoverTrigger>
@@ -317,7 +323,7 @@ export default function LedgerPage() {
 
                 <div className="flex gap-2 w-full md:hidden">
                     <div className="relative flex-grow">
-                        <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+                        <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
                         <Input
                             placeholder="Search sales..."
                             value={searchQuery}
@@ -332,11 +338,12 @@ export default function LedgerPage() {
                                 variant="outline"
                                 size="icon"
                                 className="relative"
-                                style={activeFilters > 0 ? { borderColor: theme.primary } : {}}
+                                style={activeFilters > 0 ? {borderColor: theme.primary} : {}}
                             >
-                                <Filter size={18} />
+                                <Filter size={18}/>
                                 {activeFilters > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                                    <span
+                                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
                                         {activeFilters}
                                     </span>
                                 )}
@@ -354,13 +361,15 @@ export default function LedgerPage() {
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Payment Method</label>
                                             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Payment method" />
+                                                <SelectTrigger className="h-10 w-full md:w-40">
+                                                    <SelectValue placeholder="Payment"/>
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="all">All Payments</SelectItem>
                                                     <SelectItem value="cash">Cash</SelectItem>
                                                     <SelectItem value="card">Card</SelectItem>
+                                                    <SelectItem value="aba">ABA</SelectItem>
+                                                    <SelectItem value="acleda">Acleda</SelectItem>
                                                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -368,17 +377,18 @@ export default function LedgerPage() {
 
                                         <div>
                                             <label className="text-sm font-medium mb-1 block">Currency</label>
-                                            <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Currency" />
+                                            <Select
+                                                value={currencyFilter}
+                                                onValueChange={setCurrencyFilter}
+                                            >
+                                                <SelectTrigger className="h-10 w-full md:w-40">
+                                                    <SelectValue placeholder="Currency"/>
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="all">All Currencies</SelectItem>
-                                                    {availableCurrencies.map((currency) => (
-                                                        <SelectItem key={currency} value={currency}>
-                                                            {currency}
-                                                        </SelectItem>
-                                                    ))}
+                                                    <SelectItem value="USD">USD ($)</SelectItem>
+                                                    <SelectItem value="THB">Thai Baht (฿)</SelectItem>
+                                                    <SelectItem value="KHR">Khmer Riel (៛)</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -403,7 +413,7 @@ export default function LedgerPage() {
                                                         onClick={() => setDateFilter(null)}
                                                         className="text-xs"
                                                     >
-                                                        <X size={14} className="mr-1" /> Clear date
+                                                        <X size={14} className="mr-1"/> Clear date
                                                     </Button>
                                                 </div>
                                             )}
@@ -418,7 +428,7 @@ export default function LedgerPage() {
                                         </Button>
                                         <Button
                                             className="flex-1"
-                                            style={{ backgroundColor: theme.primary, color: 'white' }}
+                                            style={{backgroundColor: theme.primary, color: 'white'}}
                                             onClick={() => setFilterSheetOpen(false)}
                                         >
                                             Apply Filters
@@ -490,11 +500,11 @@ export default function LedgerPage() {
                         </div>
                     ) : sales.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64">
-                            <FileText size={48} className="mb-4 opacity-30" />
-                            <p className="text-lg font-medium" style={{ color: theme.text }}>
+                            <FileText size={48} className="mb-4 opacity-30"/>
+                            <p className="text-lg font-medium" style={{color: theme.text}}>
                                 No sales found
                             </p>
-                            <p className="text-sm text-center px-4" style={{ color: theme.text }}>
+                            <p className="text-sm text-center px-4" style={{color: theme.text}}>
                                 {searchQuery || paymentFilter !== 'all' || currencyFilter !== 'all' || dateFilter
                                     ? 'Try changing your search filters'
                                     : 'Create your first sale to see it here'}
@@ -529,7 +539,7 @@ export default function LedgerPage() {
                                                 <TableCell>
                                                     {sale.products.length} {sale.products.length === 1 ? 'item' : 'items'}
                                                 </TableCell>
-                                                <TableCell className="font-medium" style={{ color: theme.primary }}>
+                                                <TableCell className="font-medium" style={{color: theme.primary}}>
                                                     ${Number(sale.totalAmount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell>
@@ -549,7 +559,7 @@ export default function LedgerPage() {
                                                             size="icon"
                                                             onClick={() => handleViewSale(sale)}
                                                         >
-                                                            <Eye size={20} />
+                                                            <Eye size={20}/>
                                                         </Button>
                                                         {isAdmin && (
                                                             <Button
@@ -559,7 +569,7 @@ export default function LedgerPage() {
                                                                 className="text-red-500"
                                                                 disabled={!isAdmin}
                                                             >
-                                                                <Trash2 size={20} />
+                                                                <Trash2 size={20}/>
                                                             </Button>
                                                         )}
                                                     </div>
@@ -604,25 +614,25 @@ export default function LedgerPage() {
                     onPointerDownOutside={(e) => e.preventDefault()}
                 >
                     <DialogHeader>
-                        <DialogTitle style={{ color: theme.primary }}>Confirm Deletion</DialogTitle>
+                        <DialogTitle style={{color: theme.primary}}>Confirm Deletion</DialogTitle>
                         <DialogDescription>
                             Are you sure you want to delete this sale? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     {saleToDelete && (
                         <div className="py-4">
-                            <div className="p-3 rounded-md" style={{ backgroundColor: theme.light }}>
-                                <p className="font-medium" style={{ color: theme.text }}>
+                            <div className="p-3 rounded-md" style={{backgroundColor: theme.light}}>
+                                <p className="font-medium" style={{color: theme.text}}>
                                     {saleToDelete.saleId}
                                 </p>
-                                <p className="text-sm" style={{ color: theme.text }}>
+                                <p className="text-sm" style={{color: theme.text}}>
                                     Customer: {saleToDelete.customerName}
                                 </p>
-                                <p className="text-sm" style={{ color: theme.text }}>
+                                <p className="text-sm" style={{color: theme.text}}>
                                     Items: {saleToDelete.products.length}{' '}
                                     {saleToDelete.products.length === 1 ? 'item' : 'items'}
                                 </p>
-                                <p className="text-sm" style={{ color: theme.text }}>
+                                <p className="text-sm" style={{color: theme.text}}>
                                     Total: ${Number(saleToDelete.totalAmount).toFixed(2)}
                                 </p>
                             </div>
@@ -643,7 +653,7 @@ export default function LedgerPage() {
                             onClick={handleConfirmDelete}
                             disabled={loading || !isAdmin}
                         >
-                            <Trash2 size={16} className="mr-2" />
+                            <Trash2 size={16} className="mr-2"/>
                             Proceed to Delete
                         </Button>
                     </DialogFooter>
