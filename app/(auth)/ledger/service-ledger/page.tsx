@@ -55,7 +55,6 @@ export default function ServiceLedgerPage() {
         customers,
         loading,
         pagination,
-        availableCurrencies,
         fetchPageData,
         setItemsPerPage: setItemsPerPageInHook,
         refreshData
