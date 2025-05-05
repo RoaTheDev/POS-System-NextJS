@@ -333,7 +333,7 @@ export default function SalesPage() {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 pb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-2 sm:gap-4 pb-4">
                         {isLoadingProducts || isLoadingFiltered ? (
                             <div className="col-span-full flex items-center justify-center h-40">
                                 <p style={{ color: theme.text }}>Loading products...</p>
@@ -360,7 +360,6 @@ export default function SalesPage() {
                         )}
                     </div>
 
-                    {/* Dedicated loader element that's always rendered at the bottom of the list */}
                     {!searchQuery && (
                         <div
                             ref={loadMoreRef}

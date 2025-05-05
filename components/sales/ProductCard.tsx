@@ -88,7 +88,7 @@ export default function ProductCard({product, addToCartAction, currencySymbol = 
 
     return (
         <Card
-            className="flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-md min-w-[180px] max-w-[280px] mx-auto rounded-md border-gray-200"
+            className="flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-md min-w-[140px] sm:min-w-[180px] max-w-[280px] mx-auto rounded-md border-gray-200"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
