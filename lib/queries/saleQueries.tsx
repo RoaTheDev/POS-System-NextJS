@@ -1,12 +1,14 @@
-import {collection, getDocs, query, orderBy, limit, startAfter} from 'firebase/firestore';
+import {collection, getDocs, query, orderBy, limit, startAfter, QueryDocumentSnapshot} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { ProductType } from '@/lib/types/productType';
 import { Customer } from '@/lib/stores/saleStore';
+import {firestore} from "firebase-admin";
+import DocumentData = firestore.DocumentData;
 
 type ProductsPage = {
     products: ProductType[];
-    lastVisible: any; // Changed to any to handle Firestore document reference
+    lastVisible: QueryDocumentSnapshot<DocumentData> | null;
 };
 
 export const useProducts = (pageSize = 20) => { // Increased pageSize to 20
