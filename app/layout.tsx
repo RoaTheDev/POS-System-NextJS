@@ -1,4 +1,4 @@
-import {Inter} from 'next/font/google';
+import {Inter, Noto_Sans_Khmer} from 'next/font/google';
 import type {Metadata, Viewport} from 'next';
 import {Toaster} from '@/components/ui/sonner';
 import './globals.css';
@@ -10,7 +10,11 @@ import {UnauthorizedModalProvider} from "@/lib/stores/UnathorizedModalStore";
 
 const inter = Inter({subsets: ['latin']});
 
-
+const khmerFont = Noto_Sans_Khmer({
+    subsets: ['khmer'], // Specify the Khmer subset
+    weight: ['400', '700'], // Choose desired weights
+    variable: '--font-khmer', // Optional: CSS variable for the font
+});
 export const metadata: Metadata = {
     title: 'Mai Sophany Sound POS',
     description: 'POS for Electronic',
@@ -205,7 +209,7 @@ export const viewport: Viewport = {
 }
 export default function RootLayout({children}: { children: React.ReactNode }) {
     return (
-        <html lang="en">
+        <html lang="en" className={`${khmerFont.variable}`}>
 
         <body className={inter.className}>
         <ClientProviders>
