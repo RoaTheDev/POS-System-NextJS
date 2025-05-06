@@ -22,31 +22,68 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
     const { mutate: deleteSale, isPending: isDeleting } = useSaleDelete();
     const [missingProducts, setMissingProducts] = useState<string[]>([]);
     const [isChecking, setIsChecking] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!sale || !open) {
             setMissingProducts([]);
+            setError(null);
             return;
         }
 
         const checkProducts = async () => {
             setIsChecking(true);
+            setError(null);
             const missing: string[] = [];
 
-            for (const product of sale.products) {
-                const productRef = doc(db, 'products', product.productId);
-                const productDoc = await getDoc(productRef);
+            // Validate sale.products
+            if (!Array.isArray(sale.products)) {
+                console.error('Invalid sale.products: not an array', sale.products);
+                setError('Invalid sale data: products are not properly formatted.');
+                setIsChecking(false);
+                return;
+            }
 
-                if (!productDoc.exists()) {
-                    missing.push(product.productName || product.productId);
+            console.log('Checking products for sale:', sale.saleId, sale.products);
+
+            for (const product of sale.products) {
+                // Check if product is valid and has productId
+                if (!product || typeof product !== 'object' || !product.productId) {
+                    console.warn('Skipping invalid product:', product);
+                    missing.push(product?.productName || 'Unknown Product');
+                    continue;
+                }
+
+                try {
+                    const productRef = doc(db, 'products', product.productId);
+                    const productDoc = await getDoc(productRef);
+
+                    console.log(`Product ${product.productId} (${product.productName}): exists=${productDoc.exists()}`);
+
+                    if (!productDoc.exists()) {
+                        missing.push(product.productName || product.productId);
+                    }
+                } catch (err) {
+                    console.error(`Error checking product ${product.productId} (${product.productName}):`, err);
+                    // Only add to missing if the error indicates the document doesn't exist
+                    if (err instanceof Error && err.message.includes('not-found')) {
+                        missing.push(product.productName || product.productId);
+                    } else {
+                        setError(`Failed to check product ${product.productName || product.productId}.`);
+                    }
                 }
             }
 
+            console.log('Missing products:', missing);
             setMissingProducts(missing);
             setIsChecking(false);
         };
 
-        checkProducts();
+        checkProducts().catch((err) => {
+            console.error('Error in checkProducts:', err);
+            setError('Failed to check product availability.');
+            setIsChecking(false);
+        });
     }, [sale, open]);
 
     const handleDelete = () => {
@@ -58,6 +95,10 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
                 onSuccess: async () => {
                     onClose();
                     await onSuccess();
+                },
+                onError: (err) => {
+                    console.error('Deletion error:', err);
+                    setError('Failed to delete sale.');
                 },
             }
         );
@@ -76,9 +117,21 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
                 </DialogHeader>
 
                 <div className="py-4">
+                    {error && (
+                        <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-md">
+                            <div className="flex items-start">
+                                <AlertTriangle size={18} className="mr-2 text-red-500 mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium text-red-800">Error</p>
+                                    <p className="text-xs text-red-700 mt-1">{error}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="p-3 rounded-md mb-4" style={{ backgroundColor: theme.light }}>
                         <p className="font-medium" style={{ color: theme.text }}>
-                            {sale.saleId}
+                            Sale ID: {sale.saleId}
                         </p>
                         <p className="text-sm" style={{ color: theme.text }}>
                             Customer: {sale.customerName}
@@ -104,8 +157,8 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
                                     <p className="text-sm font-medium text-amber-800">Some products no longer exist</p>
                                     <p className="text-xs text-amber-700 mt-1">
                                         {missingProducts.length === sale.products.length
-                                            ? "None of the products in this sale exist anymore. Stock cannot be restored."
-                                            : `The following products can't be restored to inventory: ${missingProducts.join(', ')}`}
+                                            ? "None of the products in this sale exist. The sale will be deleted, but no stock can be restored."
+                                            : `The following products cannot have stock restored: ${missingProducts.join(', ')}. The sale will be deleted, and stock will be restored for existing products.`}
                                     </p>
                                 </div>
                             </div>
@@ -114,26 +167,14 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
 
                     <RadioGroup value={deletionType} onValueChange={(value) => setDeletionType(value as DeletionType)}>
                         <div className="flex items-start space-x-2 mb-4">
-                            <RadioGroupItem
-                                value="wrong_order"
-                                id="wrong_order"
-                                disabled={missingProducts.length === sale.products.length}
-                            />
+                            <RadioGroupItem value="wrong_order" id="wrong_order" />
                             <div className="grid gap-1.5">
-                                <Label
-                                    htmlFor="wrong_order"
-                                    className={`font-medium ${missingProducts.length === sale.products.length ? 'text-gray-400' : ''}`}
-                                >
+                                <Label htmlFor="wrong_order" className="font-medium">
                                     Wrong Order
                                 </Label>
                                 <p className="text-sm text-gray-500">
-                                    Delete the sale and return all products back to inventory.
-                                    Use this option if the sale was created by mistake.
-                                    {missingProducts.length === sale.products.length && (
-                                        <span className="text-amber-600 block mt-1">
-                                            (Unavailable - products no longer exist)
-                                        </span>
-                                    )}
+                                    Delete the sale and attempt to return products to inventory.
+                                    If products no longer exist, the sale will be deleted without restoring stock for those products.
                                 </p>
                             </div>
                         </div>
@@ -158,7 +199,7 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
                     <Button
                         variant="destructive"
                         onClick={handleDelete}
-                        disabled={isDeleting || (deletionType === 'wrong_order' && missingProducts.length === sale.products.length)}
+                        disabled={isDeleting || !!error}
                     >
                         {isDeleting ? (
                             <>
@@ -168,9 +209,11 @@ export default function DeleteSaleModal({ open, onClose, sale, onSuccess }: Dele
                         ) : deletionType === 'wrong_order' ? (
                             <>
                                 <RefreshCw size={16} className="mr-2" />
-                                {missingProducts.length > 0 && missingProducts.length < sale.products.length
-                                    ? 'Delete & Partially Restore Stock'
-                                    : 'Delete & Restore Stock'}
+                                {missingProducts.length === sale.products.length
+                                    ? 'Delete Sale'
+                                    : missingProducts.length > 0
+                                        ? 'Delete & Partially Restore Stock'
+                                        : 'Delete & Restore Stock'}
                             </>
                         ) : (
                             <>

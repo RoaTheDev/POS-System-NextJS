@@ -18,11 +18,12 @@ export interface SalesDataResult {
     availableCurrencies: string[];
 }
 
+
 export async function fetchSalesData(
     page: number,
     itemsPerPage: number,
     filters: SaleFilter,
-    customersMap: Record<string, Customer>
+    customersMap: Record<string, Customer> = {}
 ): Promise<SalesDataResult> {
     try {
         const filterConstraints: QueryConstraint[] = [];
@@ -58,6 +59,9 @@ export async function fetchSalesData(
             if (data.currency) {
                 currencies.add(data.currency);
             }
+
+            const customerName = (data.customerId && customersMap[data.customerId]?.name) || 'Deleted Customer';
+
             return {
                 id: doc.id,
                 saleId: data.saleId,
@@ -69,19 +73,28 @@ export async function fetchSalesData(
                 currency: data.currency || 'USD',
                 exchangeRate: data.exchangeRate || 1,
                 saleDate: data.saleDate,
-                customerName: customersMap[data.customerId]?.name || 'Unknown'
+                customerName
             };
         });
 
         let filteredSales = allSales;
         if (filters.searchQuery) {
             const searchLower = filters.searchQuery.toLowerCase();
-            filteredSales = allSales.filter(
-                (sale) =>
+            filteredSales = allSales.filter((sale) => {
+                if (sale.customerName === 'Deleted Customer') {
+                    return (
+                        searchLower === '' || // Include when search is empty
+                        sale.saleId.toLowerCase().includes(searchLower) ||
+                        sale.products.some((p) => p.productName?.toLowerCase().includes(searchLower)) ||
+                        searchLower.includes('deleted customer')
+                    );
+                }
+                return (
                     sale.saleId.toLowerCase().includes(searchLower) ||
-                    sale.customerName?.toLowerCase().includes(searchLower) ||
+                    sale.customerName.toLowerCase().includes(searchLower) ||
                     sale.products.some((p) => p.productName?.toLowerCase().includes(searchLower))
-            );
+                );
+            });
         }
 
         const totalItems = filteredSales.length;
@@ -90,6 +103,7 @@ export async function fetchSalesData(
         const startIndex = (page - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedSales = filteredSales.slice(startIndex, endIndex);
+
 
         return {
             sales: paginatedSales,
@@ -103,23 +117,3 @@ export async function fetchSalesData(
     }
 }
 
-export async function fetchCustomers(): Promise<Record<string, Customer>> {
-    try {
-        const customersQuery = query(collection(db, 'customers'));
-        const customersSnapshot = await getDocs(customersQuery);
-        const customersMap: Record<string, Customer> = {};
-
-        customersSnapshot.docs.forEach((doc) => {
-            const customerData = doc.data() as Omit<Customer, 'id'>;
-            customersMap[customerData.customerId] = {
-                id: doc.id,
-                ...customerData
-            };
-        });
-
-        return customersMap;
-    } catch (error) {
-        console.error('Error fetching customers data:', error);
-        throw error;
-    }
-}

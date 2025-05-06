@@ -37,14 +37,12 @@ const CompactSaleReceipt: React.FC<ReceiptProps> = ({sale, customers, businessIn
 
     return (
         <div className="p-6 max-w-md mx-auto bg-white" id="receipt-content">
-            {/* Header */}
             <div className="text-center mb-4">
                 <h2 className="font-bold text-lg" style={{color: theme.primary}}>{businessInfo.name}</h2>
                 <p className="text-xs">{businessInfo.address}</p>
                 <p className="text-xs">{businessInfo.phone}</p>
             </div>
 
-            {/* Receipt Info */}
             <div className="border-t border-b border-gray-200 py-2 mb-3">
                 <div className="flex justify-between text-xs">
                     <span>Receipt #:</span>
@@ -60,19 +58,17 @@ const CompactSaleReceipt: React.FC<ReceiptProps> = ({sale, customers, businessIn
                 </div>
             </div>
 
-            {/* Customer */}
             <div className="mb-3">
                 <h3 className="text-xs font-bold mb-1">Customer:</h3>
-                <p className="text-xs">{sale.customerName}</p>
+                <p className="text-xs">{sale?.customerName || 'Deleted Customer'}</p>
                 {customers[sale.customerId]?.phone && (
-                    <p className="text-xs">{customers[sale.customerId]?.phone}</p>
+                    <p className="text-xs">{customers[sale.customerId]?.phone || 'N/A'}</p>
                 )}
                 {customers[sale.customerId]?.address && (
-                    <p className="text-xs">{customers[sale.customerId]?.address}</p>
+                    <p className="text-xs">{customers[sale.customerId]?.address || 'No Address'}</p>
                 )}
             </div>
 
-            {/* Products */}
             <div className="mb-3">
                 <h3 className="text-xs font-bold mb-1">Items:</h3>
 
@@ -116,7 +112,6 @@ const CompactSaleReceipt: React.FC<ReceiptProps> = ({sale, customers, businessIn
                 )}
             </div>
 
-            {/* Footer */}
             <div className="text-center text-xs mt-6 pt-2 border-t border-gray-200">
                 <p className="mb-1" style={{color: theme.primary}}>Thank you for your business!</p>
                 <p className="text-gray-500">This is a computer-generated receipt</p>

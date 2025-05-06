@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { fetchServicesData, fetchCustomers } from '@/lib/services/serviceDetailService';
+import { fetchServicesData } from '@/lib/services/serviceDetailService';
 import { ServiceFilter, ServicePagination, ServiceHistory } from '@/lib/types/serviceType';
 import { Customer } from '@/lib/stores/saleStore';
+import { fetchCustomers } from '@/lib/services/customerDataService';
 
 interface ServicesDataResult {
     services: ServiceHistory[];
@@ -43,6 +44,7 @@ export function useServiceData(initialFilters: ServiceFilter): UseServiceDataRet
             } catch (error) {
                 console.error('Error fetching customers:', error);
                 toast.error('Failed to load customer data');
+                setCustomers({});
             }
         };
 
@@ -50,20 +52,11 @@ export function useServiceData(initialFilters: ServiceFilter): UseServiceDataRet
     }, []);
 
     useEffect(() => {
-        if (
-            initialFilters.searchQuery !== filters.searchQuery ||
-            initialFilters.paymentFilter !== filters.paymentFilter ||
-            initialFilters.currencyFilter !== filters.currencyFilter ||
-            initialFilters.dateFilter?.getTime() !== filters.dateFilter?.getTime()
-        ) {
-            setFilters(initialFilters);
-        }
-    }, [initialFilters, filters]);
+        setFilters(initialFilters);
+    }, [initialFilters]);
 
     const fetchPageData = useCallback(
         async (page: number) => {
-            if (!Object.keys(customers).length) return;
-
             try {
                 setLoading(true);
                 const result: ServicesDataResult = await fetchServicesData(page, pagination.itemsPerPage, filters, customers);
@@ -79,6 +72,7 @@ export function useServiceData(initialFilters: ServiceFilter): UseServiceDataRet
             } catch (error) {
                 console.error('Error loading services data:', error);
                 toast.error('Failed to load services data');
+                setServices([]);
             } finally {
                 setLoading(false);
             }
@@ -87,9 +81,7 @@ export function useServiceData(initialFilters: ServiceFilter): UseServiceDataRet
     );
 
     useEffect(() => {
-        if (Object.keys(customers).length > 0) {
-            fetchPageData(1);
-        }
+        fetchPageData(1);
     }, [filters, pagination.itemsPerPage, customers, fetchPageData]);
 
     const setItemsPerPage = useCallback((perPage: number) => {

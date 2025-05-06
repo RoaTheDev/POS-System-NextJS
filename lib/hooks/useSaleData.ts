@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { fetchSalesData, fetchCustomers, SalesDataResult } from '@/lib/services/saleDataServices';
+import { fetchSalesData, SalesDataResult } from '@/lib/services/saleDataServices';
 import { SaleFilter, SalePagination, SaleHistory } from '@/lib/types/saleType';
 import { Customer } from '@/lib/stores/saleStore';
+import {fetchCustomers} from "@/lib/services/customerDataService";
 
 interface UseSalesDataReturn {
     sales: SaleHistory[];
@@ -36,31 +37,21 @@ export function useSalesData(initialFilters: SaleFilter): UseSalesDataReturn {
             } catch (error) {
                 console.error('Error fetching customers:', error);
                 toast.error('Failed to load customer data');
+                setCustomers({});
             }
         };
-
         getCustomers();
     }, []);
 
     useEffect(() => {
-        if (
-            initialFilters.searchQuery !== filters.searchQuery ||
-            initialFilters.paymentFilter !== filters.paymentFilter ||
-            initialFilters.currencyFilter !== filters.currencyFilter ||
-            initialFilters.dateFilter?.getTime() !== filters.dateFilter?.getTime()
-        ) {
-            setFilters(initialFilters);
-        }
-    }, [initialFilters, filters]);
+        setFilters(initialFilters);
+    }, [initialFilters]);
 
     const fetchPageData = useCallback(
         async (page: number) => {
-            if (!Object.keys(customers).length) return;
-
             try {
                 setLoading(true);
                 const result: SalesDataResult = await fetchSalesData(page, pagination.itemsPerPage, filters, customers);
-
                 setSales(result.sales);
                 setAvailableCurrencies(result.availableCurrencies);
                 setPagination((prev) => ({
@@ -72,6 +63,7 @@ export function useSalesData(initialFilters: SaleFilter): UseSalesDataReturn {
             } catch (error) {
                 console.error('Error loading sales data:', error);
                 toast.error('Failed to load sales data');
+                setSales([]);
             } finally {
                 setLoading(false);
             }
@@ -80,9 +72,7 @@ export function useSalesData(initialFilters: SaleFilter): UseSalesDataReturn {
     );
 
     useEffect(() => {
-        if (Object.keys(customers).length > 0) {
-            fetchPageData(1);
-        }
+        fetchPageData(1);
     }, [filters, pagination.itemsPerPage, customers, fetchPageData]);
 
     const setItemsPerPage = useCallback((perPage: number) => {
