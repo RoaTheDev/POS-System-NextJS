@@ -1,6 +1,5 @@
 define(['exports'], (function (exports) { 'use strict';
 
-    // @ts-ignore
     try {
       self['workbox:core:7.0.0'] && _();
     } catch (e) {}
@@ -1120,7 +1119,7 @@ define(['exports'], (function (exports) { 'use strict';
      *
      * @param {RegExp|string|workbox-routing.Route~matchCallback|workbox-routing.Route} capture
      * If the capture param is a `Route`, all other arguments will be ignored.
-     * @param {workbox-routing~handlerCallback} [handler] A callback
+     * @param {workbox-strategies.NetworkFirst} [handler] A callback
      * function that returns a Promise resulting in a Response. This parameter
      * is required if `capture` is not a `Route` object.
      * @param {string} [method='GET'] The HTTP method to match the Route

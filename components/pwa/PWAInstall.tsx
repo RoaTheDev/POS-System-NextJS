@@ -14,15 +14,12 @@ export default function PWAInstall() {
     const [isStandalone, setIsStandalone] = useState(false);
 
     useEffect(() => {
-        // Check if app is already installed
         if (window.matchMedia('(display-mode: standalone)').matches) {
             setIsStandalone(true);
         }
 
         const handleBeforeInstallPrompt = (e: Event) => {
-            // Prevent Chrome 67 and earlier from automatically showing the prompt
             e.preventDefault();
-            // Stash the event so it can be triggered later
             setDeferredPrompt(e as BeforeInstallPromptEvent);
             setIsInstallable(true);
         };
@@ -37,10 +34,8 @@ export default function PWAInstall() {
     const handleInstallClick = async () => {
         if (!deferredPrompt) return;
 
-        // Show the install prompt
-        deferredPrompt.prompt();
+        await deferredPrompt.prompt();
 
-        // Wait for the user to respond to the prompt
         const { outcome } = await deferredPrompt.userChoice;
 
         if (outcome === 'accepted') {
@@ -49,7 +44,6 @@ export default function PWAInstall() {
             console.log('User dismissed the install prompt');
         }
 
-        // Clear the deferredPrompt for next time
         setDeferredPrompt(null);
         setIsInstallable(false);
     };
