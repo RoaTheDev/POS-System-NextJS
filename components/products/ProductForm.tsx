@@ -162,7 +162,7 @@ export default function ProductForm({
                                         <FormLabel>Price</FormLabel>
                                         <FormControl>
 
-                                            <Input type="number" min={1} step={1} {...field}  />
+                                            <Input type="number" min={0.01} step={0.01} {...field}  />
                                         </FormControl>
                                         <FormMessage/>
                                     </FormItem>
@@ -215,7 +215,6 @@ export default function ProductForm({
                                     </div>
                                 ) : imagePreview ? (
                                     <div className="relative w-full h-32">
-                                        {/* Use CldImage for Cloudinary images that are already uploaded */}
                                         {initialData?.cloudinaryPublicId && !imageFile ? (
                                             <CldImage
                                                 src={initialData.cloudinaryPublicId}
@@ -225,7 +224,6 @@ export default function ProductForm({
                                                 className="rounded-md"
                                             />
                                         ) : (
-                                            // Use regular Image for local file previews
                                             <Image
                                                 src={imagePreview}
                                                 alt="Product preview"

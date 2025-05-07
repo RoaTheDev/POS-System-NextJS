@@ -236,7 +236,6 @@ export default function ServiceEntryPage() {
 
     return (
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-            {/* Service Entry Section */}
             <div className="flex-1">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl md:text-3xl font-bold flex items-center" style={{ color: theme.primary }}>
@@ -293,17 +292,24 @@ export default function ServiceEntryPage() {
                             <Input
                                 placeholder="Enter price"
                                 type="number"
-                                inputMode="numeric"
+                                step="0.01"
                                 min="0"
                                 value={service.price || ''}
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    if (!isNaN(Number(val))) {
-                                        setService((prev) => ({ ...prev, price: Number(val) }));
+                                    if (val === '' || !isNaN(Number(val))) {
+                                        setService((prev) => ({ ...prev, price: val === '' ? 0 : Number(val) }));
                                     }
                                 }}
                                 onKeyDown={(e) => {
-                                    const allowedKeys = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete'];
+                                    const allowedKeys = [
+                                        'Backspace',
+                                        'Tab',
+                                        'ArrowLeft',
+                                        'ArrowRight',
+                                        'Delete',
+                                        '.',
+                                    ];
                                     if (!/[0-9]/.test(e.key) && !allowedKeys.includes(e.key)) {
                                         e.preventDefault();
                                     }
