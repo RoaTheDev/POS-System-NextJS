@@ -16,6 +16,18 @@ const FALLBACK_RATES: Record<CurrencyCode, Record<CurrencyCode, number>> = {
     'KHR': { 'USD': 0.00024, 'THB': 0.0083, 'KHR': 1 }
 };
 
+function roundCurrency(amount: number, currency: CurrencyCode): number {
+    switch (currency) {
+        case 'THB':
+            return Math.ceil(amount); // Round up to whole number (no decimals)
+        case 'KHR':
+            return Math.round(amount / 100) * 100; // Round up to nearest a thousand (no decimals)
+        case 'USD':
+        default:
+            return Math.round(amount * 100) / 100; // Round to 2 decimal places
+    }
+}
+
 export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
     const isMounted = useRef(true);
 
@@ -98,20 +110,22 @@ export function useExchangeRates(baseCurrency: CurrencyCode = 'USD') {
             if (fromCurrency === toCurrency) return amount;
 
             const currentRates = latestRates.current;
+            let convertedAmount: number;
 
             if (fromCurrency === baseCurrency) {
-                return amount * currentRates[toCurrency];
+                convertedAmount = amount * currentRates[toCurrency];
             } else if (toCurrency === baseCurrency) {
-                return amount / currentRates[fromCurrency];
-            }
-
-            if (baseCurrency !== fromCurrency && baseCurrency !== toCurrency) {
+                convertedAmount = amount / currentRates[fromCurrency];
+            } else if (baseCurrency !== fromCurrency && baseCurrency !== toCurrency) {
                 const amountInBaseCurrency = amount / currentRates[fromCurrency];
-                return amountInBaseCurrency * currentRates[toCurrency];
+                convertedAmount = amountInBaseCurrency * currentRates[toCurrency];
+            } else {
+                console.warn('Using fallback exchange rates for conversion');
+                convertedAmount = amount * FALLBACK_RATES[fromCurrency][toCurrency];
             }
 
-            console.warn('Using fallback exchange rates for conversion');
-            return amount * FALLBACK_RATES[fromCurrency][toCurrency];
+            // Apply currency-specific rounding
+            return roundCurrency(convertedAmount, toCurrency);
         },
         [baseCurrency]
     );

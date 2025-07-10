@@ -48,7 +48,9 @@ export default function Navigation() {
                     {navItems.map(item => (
                         <li key={item.name}>
                             <button
-                                onClick={() => router.push(item.path)}
+                                onClick={() =>{
+                                    router.push(item.path)
+                                }}
                                 className={`flex w-full items-center p-3 rounded-lg ${
                                     activePage === item.name ? 'text-white' : 'hover:bg-opacity-10 hover:bg-gray-100'
                                 }`}
